@@ -1,0 +1,77 @@
+"""
+Example: Using the Plot Endpoint in a React/TypeScript Frontend
+"""
+
+# TypeScript Interface
+interface PlotRequest {
+  dataset_id: string;
+  channels: number[];
+  time_start: number;
+  time_end: number;
+}
+
+# React Component Example
+"""
+import React, { useState } from 'react';
+
+const PlotViewer: React.FC = () => {
+  const [plotUrl, setPlotUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const generatePlot = async () => {
+    setLoading(true);
+    
+    const request: PlotRequest = {
+      dataset_id: 'my_dataset.txt',
+      channels: [0, 1, 2],
+      time_start: 0.0,
+      time_end: 5.0
+    };
+
+    try {
+      const response = await fetch('http://localhost:8000/datasets/plot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request)
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setPlotUrl(url);
+      } else {
+        console.error('Failed to generate plot:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={generatePlot} disabled={loading}>
+        {loading ? 'Generating...' : 'Generate Plot'}
+      </button>
+      
+      {plotUrl && (
+        <div>
+          <img 
+            src={plotUrl} 
+            alt="EEG Signal Plot" 
+            style={{ width: '100%', maxWidth: '1200px' }}
+          />
+          <a href={plotUrl} download="plot.png">
+            Download Plot
+          </a>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PlotViewer;
+"""
