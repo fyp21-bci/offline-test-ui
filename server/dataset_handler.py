@@ -9,6 +9,57 @@ import pandas as pd
 from pathlib import Path
 
 
+def unwrap_sample_indices(indices):
+    """
+    Unwrap OpenBCI sample indices (0-255 rollover) into a continuous sequence.
+    Handles packet loss by respecting positive jumps > 1 but handles the 255->0 wrap.
+    
+    Parameters:
+    -----------
+    indices : np.ndarray
+        Array of sample indices (0-255)
+        
+    Returns:
+    --------
+    unwrapped : np.ndarray
+        Continuous int64 array of sample indices
+    """
+    # Calculate difference between consecutive samples
+    diff = np.diff(indices)
+    
+    # Identify where rollover happened (e.g. 255 -> 0, diff is approx -255)
+    # A true rollover is a large negative jump. 
+    # Packet loss is a jump > 1 but not negative.
+    
+    # Detect wraps: Current < Previous (large drop)
+    rollover_mask = diff < 0
+    
+    # Calculate cumulative offset: each rollover adds 256
+    offset_increment = 256
+    offsets = np.zeros_like(indices, dtype=np.int64)
+    offsets[1:] = np.cumsum(rollover_mask) * offset_increment
+    
+    return indices.astype(np.int64) + offsets
+
+
+def detect_header_rows(filepath, max_lines=20):
+    """
+    Detect optimal skiprows for OpenBCI text files.
+    """
+    with open(filepath, 'r') as f:
+        for i in range(max_lines):
+            line = f.readline()
+            if line.strip().startswith("Sample Index") or line.strip().startswith("%OpenBCI"):
+                if line.strip().startswith("Sample Index"):
+                     # If we found the header column row, this is the header (0-indexed).
+                     return i
+                if line.strip().startswith("%"):
+                    # Comment line, keep going
+                    continue
+    # Default fallback
+    return 4 
+
+
 def load_openbci_txt(filepath, channel=0):
     """
     Load OpenBCI text file and extract data from specified EXG channel.
@@ -33,8 +84,15 @@ def load_openbci_txt(filepath, channel=0):
     """
     filepath = Path(filepath)
     
-    # Read the CSV file, skipping comment lines
-    df = pd.read_csv(filepath, skiprows=4)
+    # Detect header row dynamically
+    skip_rows = detect_header_rows(filepath)
+    
+    # Read the CSV file
+    try:
+        df = pd.read_csv(filepath, skiprows=skip_rows)
+    except pd.errors.ParserError:
+        # Fallback to python engine if C engine fails (sometimes robust for weird files)
+        df = pd.read_csv(filepath, skiprows=skip_rows, engine='python')
     
     # Strip leading/trailing spaces from column names
     df.columns = df.columns.str.strip()
@@ -46,7 +104,9 @@ def load_openbci_txt(filepath, channel=0):
         raise ValueError(f"Channel {channel} not found. Available columns: {df.columns.tolist()}")
     
     data = df[channel_col].values.astype(np.float64)
-    sample_indices = df["Sample Index"].values
+    
+    raw_indices = df["Sample Index"].values
+    sample_indices = unwrap_sample_indices(raw_indices)
     
     # Get timestamp info (sampling rate is 250 Hz as per header)
     fs = 250  # OpenBCI GUI standard sampling rate
@@ -88,8 +148,14 @@ def load_openbci_multiple_channels(filepath, channels=None):
     if channels is None:
         channels = list(range(8))  # All 8 EXG channels
     
+    # Detect header row dynamically
+    skip_rows = detect_header_rows(filepath)
+    
     # Read the CSV file
-    df = pd.read_csv(filepath, skiprows=4)
+    try:
+        df = pd.read_csv(filepath, skiprows=skip_rows)
+    except pd.errors.ParserError:
+        df = pd.read_csv(filepath, skiprows=skip_rows, engine='python')
     df.columns = df.columns.str.strip()
     
     # Extract all channels
@@ -101,7 +167,9 @@ def load_openbci_multiple_channels(filepath, channels=None):
         data_list.append(df[channel_col].values.astype(np.float64))
     
     data = np.array(data_list)
-    sample_indices = df["Sample Index"].values
+    
+    raw_indices = df["Sample Index"].values
+    sample_indices = unwrap_sample_indices(raw_indices)
     fs = 250
     
     print(f"✓ Loaded {len(channels)} channels with {data.shape[1]} samples from {filepath.name}")
@@ -173,7 +241,13 @@ def get_available_channels(filepath):
         Available channel indices (0-7)
     """
     filepath = Path(filepath)
-    df = pd.read_csv(filepath, skiprows=4)
+    # Detect header row dynamically
+    skip_rows = detect_header_rows(filepath)
+    
+    try:
+        df = pd.read_csv(filepath, skiprows=skip_rows)
+    except pd.errors.ParserError:
+        df = pd.read_csv(filepath, skiprows=skip_rows, engine='python')
     df.columns = df.columns.str.strip()
     
     channels = []

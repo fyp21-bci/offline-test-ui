@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from app.core.registry import Registry
-from app.models.api import ProcessorInfo, DatasetInfo, RunAnalysisRequest, AnalysisResponse, PlotRequest
+from app.models.api import ProcessorInfo, DatasetInfo, RunAnalysisRequest, AnalysisResponse, PlotRequest, ClassificationPlotRequest
 from app.core.types import SignalData
 
 # Import specific modules to ensure they register themselves
@@ -356,3 +356,269 @@ async def generate_plot(request: PlotRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+def _plot_classification(
+    signal_data: SignalData,
+    classification_results: List[Dict[str, Any]],
+    time_start: float,
+    time_end: float,
+    channel_indices: List[int],
+    channel_names: List[str],
+    target_frequencies: set[float] = None
+) -> plt.Figure:
+    """
+    Generate a classification plot with color-coded backgrounds.
+    
+    Args:
+        signal_data: Full signal data
+        classification_results: List of classification results for each sub-window
+        time_start: Start time in seconds
+        time_end: End time in seconds
+        channel_indices: List of channel indices to plot
+        channel_names: List of all channel names
+        target_frequencies: Optional set of target frequencies for correctness evaluation
+    
+    Returns:
+        matplotlib Figure object
+    """
+    fs = signal_data.fs
+    data_array = np.array(signal_data.data)
+    
+    fig, axes = plt.subplots(
+        len(channel_indices), 
+        1, 
+        figsize=(12, 2 * len(channel_indices)),
+        squeeze=False
+    )
+    
+    for i, ch_idx in enumerate(channel_indices):
+        ax = axes[i, 0]
+        
+        # Plot each sub-window with its averaged signal and colored background
+        for result in classification_results:
+            start_time = result['start_time']
+            end_time = result['end_time']
+            best_freq = result['best_frequency']
+            
+            # Convert to sample indices
+            start_sample = int(start_time * fs)
+            end_sample = int(end_time * fs)
+            
+            # Extract sub-window signal
+            window_signal = data_array[ch_idx, start_sample:end_sample]
+            
+            # Calculate averaged signal (mean of the signal)
+            averaged_signal = np.mean(window_signal)
+            
+            # Create time axis for this window
+            time_axis = np.linspace(start_time, end_time, len(window_signal))
+            
+            # Determine background color
+            if target_frequencies:
+                # Check if best_freq is close to ANY of the target frequencies
+                is_correct = any(abs(best_freq - tf) < 0.01 for tf in target_frequencies)
+                color = 'green' if is_correct else 'red'
+                alpha = 0.2
+            else:
+                color = 'gray'
+                alpha = 0.1
+            
+            # Add colored background
+            ax.axvspan(start_time, end_time, color=color, alpha=alpha)
+            
+            # Plot the averaged signal as a horizontal line for this window
+            ax.hlines(averaged_signal, start_time, end_time, colors='blue', linewidth=1.5)
+            
+            # Also plot the actual signal in lighter color
+            ax.plot(time_axis, window_signal, linewidth=0.5, alpha=0.5, color='navy')
+        
+        ax.set_ylabel(f'{channel_names[ch_idx]}')
+        ax.set_xlim(time_start, time_end)
+        ax.grid(True, alpha=0.3)
+        
+        # Remove x-tick labels for all but bottom subplot
+        if i < len(channel_indices) - 1:
+            ax.set_xticklabels([])
+        else:
+            ax.set_xlabel('Time (s)')
+    
+    plt.tight_layout()
+    return fig
+
+
+@router.post("/datasets/plot-classification")
+async def generate_classification_plot(request: ClassificationPlotRequest):
+    """
+    Generate a classification plot with color-coded segments.
+    
+    Parameters:
+    - dataset_id: ID of the dataset
+    - channels: List of channel indices to plot
+    - time_start: Start time in seconds
+    - time_end: End time in seconds
+    - processor_name: Name of classification processor
+    - processor_config: Configuration including window_sec, frequencies, n_harmonics
+    - target_frequency: Optional target frequency (or list/string) for correctness evaluation
+    
+    Returns a PNG image with color-coded backgrounds and JSON metadata.
+    """
+    file_path = DATA_DIR / request.dataset_id
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Dataset not found")
+        
+    loader_cls = Registry.get_dataloader_for_file(str(file_path))
+    if not loader_cls:
+        raise HTTPException(status_code=400, detail="No suitable data loader found for this file type")
+        
+    try:
+        # Load data
+        loader = loader_cls()
+        signal_data: SignalData = loader.load(str(file_path))
+        
+        # Validate channels
+        num_channels = len(signal_data.data)
+        for ch_idx in request.channels:
+            if ch_idx < 0 or ch_idx >= num_channels:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Channel index {ch_idx} out of range (0-{num_channels-1})"
+                )
+        
+        # Validate time window
+        data_array = np.array(signal_data.data)
+        total_samples = data_array.shape[1]
+        total_duration = total_samples / signal_data.fs
+        
+        if request.time_start < 0 or request.time_end > total_duration:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Time window out of range. Valid range: 0 to {total_duration:.2f}s"
+            )
+        
+        if request.time_start >= request.time_end:
+            raise HTTPException(
+                status_code=400,
+                detail="time_start must be less than time_end"
+            )
+        
+        # Get processor
+        proc_cls = Registry.get_processor(request.processor_name)
+        if not proc_cls:
+            raise HTTPException(status_code=404, detail="Processor not found")
+        
+        # Extract time window and channels for processing
+        start_sample = int(request.time_start * signal_data.fs)
+        end_sample = int(request.time_end * signal_data.fs)
+        
+        # Select data for requested channels
+        channel_indices = request.channels
+        selected_data = data_array[channel_indices, start_sample:end_sample]
+        
+        # Get selected channel names
+        all_channel_names = signal_data.channel_names if signal_data.channel_names else [f"Channel {i}" for i in range(num_channels)]
+        selected_channel_names = [all_channel_names[i] for i in channel_indices]
+        
+        # Create a windowed SignalData object with ONLY selected channels
+        windowed_data = SignalData(
+            data=selected_data.tolist(),
+            fs=signal_data.fs,
+            channel_names=selected_channel_names
+        )
+        
+        # Process with classification algorithm
+        processor = proc_cls()
+        result = processor.process(windowed_data, request.processor_config)
+        
+        # Extract classification results
+        classification_results = result.data.get('results', [])
+        
+        # Adjust times to be relative to the full dataset
+        for res in classification_results:
+            res['start_time'] += request.time_start
+            res['end_time'] += request.time_start
+        
+        # Parse target frequencies
+        target_frequencies = set()
+        if request.target_frequency is not None:
+            if isinstance(request.target_frequency, float) or isinstance(request.target_frequency, int):
+                target_frequencies.add(float(request.target_frequency))
+            elif isinstance(request.target_frequency, list):
+                target_frequencies.update(float(f) for f in request.target_frequency)
+            elif isinstance(request.target_frequency, str):
+                # Handle comma-separated string
+                parts = request.target_frequency.split(',')
+                for p in parts:
+                    try:
+                        target_frequencies.add(float(p.strip()))
+                    except ValueError:
+                        pass # Ignore invalid numbers
+        
+        # Calculate segment counts per frequency
+        frequency_counts = {}
+        correct_count = 0
+        incorrect_count = 0
+        
+        for res in classification_results:
+            freq = res['best_frequency']
+            frequency_counts[freq] = frequency_counts.get(freq, 0) + 1
+            
+            if target_frequencies:
+                is_correct = any(abs(freq - tf) < 0.01 for tf in target_frequencies)
+                if is_correct:
+                    correct_count += 1
+                else:
+                    incorrect_count += 1
+        
+        # Get channel names
+        channel_names = signal_data.channel_names
+        if not channel_names:
+            channel_names = [f"Channel {i}" for i in range(num_channels)]
+        
+        # Generate plot
+        fig = _plot_classification(
+            signal_data,
+            classification_results,
+            request.time_start,
+            request.time_end,
+            request.channels,
+            channel_names,
+            target_frequencies if target_frequencies else None
+        )
+        
+        # Save to BytesIO buffer
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        buf.seek(0)
+        
+        # Prepare metadata
+        metadata = {
+            "total_segments": len(classification_results),
+            "frequency_counts": frequency_counts,
+        }
+        
+        if target_frequencies:
+            metadata["target_frequencies"] = list(target_frequencies)
+            metadata["correct_count"] = correct_count
+            metadata["incorrect_count"] = incorrect_count
+            metadata["accuracy"] = correct_count / len(classification_results) if classification_results else 0
+        
+        # Return both image and metadata
+        # We'll return the image directly and include metadata in headers
+        from fastapi.responses import JSONResponse
+        import base64
+        
+        # Encode image as base64
+        image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        
+        return JSONResponse(content={
+            "image": f"data:image/png;base64,{image_base64}",
+            "metadata": metadata
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

@@ -30,7 +30,8 @@ class OpenBCILoader(DataLoader):
             metadata={
                 "source": "OpenBCI",
                 "original_path": filepath,
-                "n_samples": data.shape[1]
+                "n_samples": data.shape[1],
+                "sample_indices": sample_indices.tolist() # Store unwrapped indices
             }
         )
         

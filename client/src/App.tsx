@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import DatasetSelector from './components/DatasetSelector';
 import AlgorithmChain from './components/ProcessorConfig/AlgorithmChain';
+import TMSIConfig from './components/ProcessorConfig/TMSIConfig';
 import TimeSeriesChart from './components/Visualizations/TimeSeriesChart';
 import HorizontalChannelControls from './components/Visualizations/HorizontalChannelControls';
 import PlotControls from './components/Visualizations/PlotControls';
 import HighResPlot from './components/Visualizations/HighResPlot';
 import FFTPlot from './components/Visualizations/FFTPlot';
+import TMSIPlot from './components/Visualizations/TMSIPlot';
 import { ApiService, type AnalysisResult } from './api/client';
 
 function App() {
@@ -28,6 +30,14 @@ function App() {
   const [xAxisRange, setXAxisRange] = useState<[number, number] | null>(null);
   const [userSelectedRange, setUserSelectedRange] = useState<[number, number] | null>(null);
   const [samplingRate, setSamplingRate] = useState(250);
+
+  // TMSI Configuration State
+  const [tmsiConfig, setTmsiConfig] = useState({
+    frequencies: [8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0],
+    window_sec: 1.0,
+    n_harmonics: 5,
+    target_frequency: null as number | number[] | null
+  });
 
   // Derived state: Get selected channel indices for plot image
   const selectedChannelIndices = availableChannels
@@ -88,7 +98,7 @@ function App() {
             formatted.push(point);
           }
 
-          setRawSignalData(formatted.slice(0, 5000));
+          setRawSignalData(formatted);
           setSamplingRate(res.fs);
         })
         .catch(err => {
@@ -214,6 +224,9 @@ function App() {
               Used to color-code classification accuracy in the time series view.
             </p>
           </div>
+
+          {/* TMSI Configuration */}
+          <TMSIConfig onConfigChange={setTmsiConfig} />
         </div>
 
         {/* Main Content: Pipeline & Viz */}
@@ -298,6 +311,21 @@ function App() {
                     timeWindow={timeWindow}
                     samplingRate={samplingRate}
                     dataLength={rawSignalData.length}
+                  />
+                </div>
+              </div>
+
+              {/* TMSI Classification Plot (Below FFT, Centered) */}
+              <div className="flex justify-center w-full">
+                <div className="w-full">
+                  <TMSIPlot
+                    datasetId={selectedDatasetId}
+                    selectedChannels={selectedChannelIndices}
+                    timeWindow={timeWindow}
+                    samplingRate={samplingRate}
+                    dataLength={rawSignalData.length}
+                    tmsiConfig={tmsiConfig}
+                    targetFrequency={tmsiConfig.target_frequency || undefined}
                   />
                 </div>
               </div>

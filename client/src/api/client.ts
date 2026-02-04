@@ -129,4 +129,48 @@ export const ApiService = {
         console.log('🌐 API: Plot image received successfully');
         return imageUrl;
     },
+
+    // TMSI Classification Plot
+    getClassificationPlot: async (
+        datasetId: string,
+        channels: number[],
+        timeStart: number,
+        timeEnd: number,
+        processorConfig: {
+            frequencies: number[];
+            window_sec: number;
+            n_harmonics: number;
+            [key: string]: any; // Allow other props but filter them out
+        },
+        targetFrequency?: number | number[]
+    ): Promise<{ image: string; metadata: any }> => {
+        console.log('🌐 API: Requesting TMSI classification plot:', {
+            datasetId,
+            channels,
+            timeStart,
+            timeEnd,
+            processorConfig,
+            targetFrequency
+        });
+
+        // Extract only the fields expected by the backend for processor_config
+        const { frequencies, window_sec, n_harmonics } = processorConfig;
+
+        const response = await api.post('/datasets/plot-classification', {
+            dataset_id: datasetId,
+            channels,
+            time_start: timeStart,
+            time_end: timeEnd,
+            processor_name: 'TMSI Classifier',
+            processor_config: {
+                frequencies,
+                window_sec,
+                n_harmonics
+            },
+            target_frequency: targetFrequency
+        });
+
+        console.log('🌐 API: Classification plot received successfully');
+        return response.data;
+    },
 };
