@@ -19,6 +19,7 @@ from app.core.types import SignalData
 import app.modules.dataloaders.openbci
 import app.modules.processors.tmsi
 import app.modules.processors.fft
+import app.modules.processors.fbcca
 
 router = APIRouter()
 
@@ -175,96 +176,9 @@ async def get_dataset_data(dataset_id: str, channel_idx: int | None = None):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-def _plot_time_domain(
-    time_slice: np.ndarray,
-    time_axis: np.ndarray,
-    channel_indices: List[int],
-    channel_names: List[str]
-) -> plt.Figure:
-    """
-    Generate a time-domain plot for signal data.
-    
-    Args:
-        time_slice: Signal data array (channels x samples)
-        time_axis: Time values in seconds
-        channel_indices: List of channel indices to plot
-        channel_names: List of all channel names
-    
-    Returns:
-        matplotlib Figure object
-    """
-    fig, axes = plt.subplots(
-        len(channel_indices), 
-        1, 
-        figsize=(12, 2 * len(channel_indices)),
-        squeeze=False
-    )
-    
-    for i, ch_idx in enumerate(channel_indices):
-        ax = axes[i, 0]
-        ax.plot(time_axis, time_slice[ch_idx, :], linewidth=0.8)
-        ax.set_ylabel(channel_names[ch_idx])
-        ax.grid(True, alpha=0.3)
-        
-        # Remove x-tick labels for all but bottom subplot
-        if i < len(channel_indices) - 1:
-            ax.set_xticklabels([])
-        else:
-            ax.set_xlabel('Time (s)')
-    
-    plt.tight_layout()
-    return fig
+from app.core.plotting import plot_time_domain, plot_frequency_domain, plot_classification
 
-def _plot_frequency_domain(
-    time_slice: np.ndarray,
-    fs: float,
-    channel_indices: List[int],
-    channel_names: List[str]
-) -> plt.Figure:
-    """
-    Generate a frequency-domain (FFT) plot for signal data.
-    
-    Args:
-        time_slice: Signal data array (channels x samples)
-        fs: Sampling frequency in Hz
-        channel_indices: List of channel indices to plot
-        channel_names: List of all channel names
-    
-    Returns:
-        matplotlib Figure object
-    """
-    fig, axes = plt.subplots(
-        len(channel_indices), 
-        1, 
-        figsize=(12, 2 * len(channel_indices)),
-        squeeze=False
-    )
-    
-    for i, ch_idx in enumerate(channel_indices):
-        # Compute FFT
-        signal = time_slice[ch_idx, :]
-        n_samples = len(signal)
-        
-        # Use rfft for real signals (more efficient)
-        fft_values = np.fft.rfft(signal)
-        fft_magnitude = np.abs(fft_values)
-        fft_frequencies = np.fft.rfftfreq(n_samples, 1/fs)
-        
-        # Plot
-        ax = axes[i, 0]
-        ax.plot(fft_frequencies, fft_magnitude, linewidth=0.8)
-        ax.set_ylabel(f"{channel_names[ch_idx]}\nMagnitude")
-        ax.set_xlim(0, 60)  # Limit frequency range to physiological EEG range (0-60Hz)
-        ax.grid(True, alpha=0.3)
-        
-        # Remove x-tick labels for all but bottom subplot
-        if i < len(channel_indices) - 1:
-            ax.set_xticklabels([])
-        else:
-            ax.set_xlabel('Frequency (Hz)')
-    
-    plt.tight_layout()
-    return fig
+
 
 
 @router.post("/datasets/plot")
@@ -334,9 +248,9 @@ async def generate_plot(request: PlotRequest):
         # Generate plot based on type
         if request.plot_type == "time":
             time_axis = np.arange(start_sample, end_sample) / signal_data.fs
-            fig = _plot_time_domain(time_slice, time_axis, request.channels, channel_names)
+            fig = plot_time_domain(time_slice, time_axis, request.channels, channel_names)
         elif request.plot_type == "fft":
-            fig = _plot_frequency_domain(time_slice, signal_data.fs, request.channels, channel_names)
+            fig = plot_frequency_domain(time_slice, signal_data.fs, request.channels, channel_names)
         else:
             raise HTTPException(status_code=400, detail=f"Invalid plot_type: {request.plot_type}")
         
@@ -357,93 +271,7 @@ async def generate_plot(request: PlotRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _plot_classification(
-    signal_data: SignalData,
-    classification_results: List[Dict[str, Any]],
-    time_start: float,
-    time_end: float,
-    channel_indices: List[int],
-    channel_names: List[str],
-    target_frequencies: set[float] = None
-) -> plt.Figure:
-    """
-    Generate a classification plot with color-coded backgrounds.
-    
-    Args:
-        signal_data: Full signal data
-        classification_results: List of classification results for each sub-window
-        time_start: Start time in seconds
-        time_end: End time in seconds
-        channel_indices: List of channel indices to plot
-        channel_names: List of all channel names
-        target_frequencies: Optional set of target frequencies for correctness evaluation
-    
-    Returns:
-        matplotlib Figure object
-    """
-    fs = signal_data.fs
-    data_array = np.array(signal_data.data)
-    
-    fig, axes = plt.subplots(
-        len(channel_indices), 
-        1, 
-        figsize=(12, 2 * len(channel_indices)),
-        squeeze=False
-    )
-    
-    for i, ch_idx in enumerate(channel_indices):
-        ax = axes[i, 0]
-        
-        # Plot each sub-window with its averaged signal and colored background
-        for result in classification_results:
-            start_time = result['start_time']
-            end_time = result['end_time']
-            best_freq = result['best_frequency']
-            
-            # Convert to sample indices
-            start_sample = int(start_time * fs)
-            end_sample = int(end_time * fs)
-            
-            # Extract sub-window signal
-            window_signal = data_array[ch_idx, start_sample:end_sample]
-            
-            # Calculate averaged signal (mean of the signal)
-            averaged_signal = np.mean(window_signal)
-            
-            # Create time axis for this window
-            time_axis = np.linspace(start_time, end_time, len(window_signal))
-            
-            # Determine background color
-            if target_frequencies:
-                # Check if best_freq is close to ANY of the target frequencies
-                is_correct = any(abs(best_freq - tf) < 0.01 for tf in target_frequencies)
-                color = 'green' if is_correct else 'red'
-                alpha = 0.2
-            else:
-                color = 'gray'
-                alpha = 0.1
-            
-            # Add colored background
-            ax.axvspan(start_time, end_time, color=color, alpha=alpha)
-            
-            # Plot the averaged signal as a horizontal line for this window
-            ax.hlines(averaged_signal, start_time, end_time, colors='blue', linewidth=1.5)
-            
-            # Also plot the actual signal in lighter color
-            ax.plot(time_axis, window_signal, linewidth=0.5, alpha=0.5, color='navy')
-        
-        ax.set_ylabel(f'{channel_names[ch_idx]}')
-        ax.set_xlim(time_start, time_end)
-        ax.grid(True, alpha=0.3)
-        
-        # Remove x-tick labels for all but bottom subplot
-        if i < len(channel_indices) - 1:
-            ax.set_xticklabels([])
-        else:
-            ax.set_xlabel('Time (s)')
-    
-    plt.tight_layout()
-    return fig
+
 
 
 @router.post("/datasets/plot-classification")
@@ -575,7 +403,7 @@ async def generate_classification_plot(request: ClassificationPlotRequest):
             channel_names = [f"Channel {i}" for i in range(num_channels)]
         
         # Generate plot
-        fig = _plot_classification(
+        fig = plot_classification(
             signal_data,
             classification_results,
             request.time_start,

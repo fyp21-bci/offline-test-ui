@@ -34,16 +34,16 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onSelect, selectedId 
     };
 
     return (
-        <div className="card h-full">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-medium flex items-center gap-2">
-                    <FileText size={20} />
-                    Datasets
+        <div className="card h-full flex flex-col">
+            <div className="flex items-center justify-between mb-8">
+                <h3 className="text-2xl font-bold flex items-center gap-4 text-white">
+                    <FileText size={32} />
+                    Data Files
                 </h3>
-                <label className={`btn btn-outline text-sm px-3 py-1.5 gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                    <FileUp size={16} />
-                    {uploading ? 'Uploading...' : 'Upload'}
-                    <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept=".txt,.csv" />
+                <label className={`btn btn-primary px-6 py-3 gap-3 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <FileUp size={24} />
+                    {uploading ? 'Uploading...' : 'Upload New'}
+                    <input type="file" className="hidden" style={{ display: 'none' }} onChange={handleUpload} disabled={uploading} accept=".txt,.csv" />
                 </label>
             </div>
 
@@ -55,13 +55,17 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onSelect, selectedId 
                     <button
                         key={ds.id}
                         onClick={() => onSelect(ds.id)}
-                        className={`w-full text-left px-4 py-3 rounded flex items-center justify-between transition-colors ${selectedId === ds.id
-                            ? 'bg-purple-500/20 border border-purple-500/50 text-purple-200'
-                            : 'bg-gray-800 border border-gray-700 hover:border-gray-500'
+                        className={`w-full text-left px-6 py-5 rounded-xl flex items-center justify-between transition-all duration-200 border-2 mb-2 ${selectedId === ds.id
+                            ? 'bg-accent border-accent text-black font-bold shadow-[0_0_20px_rgba(14,165,233,0.4)]'
+                            : 'bg-transparent border-transparent hover:bg-slate-800/50 text-white opacity-80 hover:opacity-100'
                             }`}
+                        style={{
+                            backgroundColor: selectedId === ds.id ? 'var(--accent-color)' : 'transparent',
+                            color: selectedId === ds.id ? '#000000' : '#ffffff'
+                        }}
                     >
-                        <span className="truncate text-base">{ds.filename}</span>
-                        {selectedId === ds.id && <Check size={16} className="text-purple-400" />}
+                        <span className="truncate text-xl font-medium">{ds.filename}</span>
+                        {selectedId === ds.id && <Check size={28} className="text-black" />}
                     </button>
                 ))}
             </div>

@@ -1,27 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ApiService } from '../../api/client';
 
-interface TMSIPlotProps {
+interface FBCCAPlotProps {
     datasetId: string | null;
     selectedChannels: number[];
     timeWindow: { start: number; end: number } | null;
     samplingRate: number;
     dataLength: number;
-    tmsiConfig: {
+    fbccaConfig: {
         frequencies: number[];
         window_sec: number;
         n_harmonics: number;
+        n_subbands: number;
     };
     targetFrequency?: number | number[];
 }
 
-const TMSIPlot: React.FC<TMSIPlotProps> = ({
+const FBCCAPlot: React.FC<FBCCAPlotProps> = ({
     datasetId,
     selectedChannels,
     timeWindow,
     samplingRate,
     dataLength,
-    tmsiConfig,
+    fbccaConfig,
     targetFrequency
 }) => {
     const [plotImageUrl, setPlotImageUrl] = useState<string | null>(null);
@@ -30,10 +31,10 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
     const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Fetch TMSI classification plot when parameters change
+    // Fetch FBCCA classification plot when parameters change
     useEffect(() => {
         const fetchPlot = async () => {
-            if (!datasetId || selectedChannels.length === 0 || tmsiConfig.frequencies.length === 0) {
+            if (!datasetId || selectedChannels.length === 0 || fbccaConfig.frequencies.length === 0) {
                 setPlotImageUrl(null);
                 setMetadata(null);
                 return;
@@ -43,11 +44,11 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
             const startTime = timeWindow ? timeWindow.start : 0;
             const endTime = timeWindow ? timeWindow.end : (dataLength / samplingRate);
 
-            console.log('📊 TMSIPlot: Fetching classification plot with:', {
+            console.log('📊 FBCCAPlot: Fetching classification plot with:', {
                 datasetId,
                 channels: selectedChannels,
                 timeWindow: { start: startTime, end: endTime },
-                tmsiConfig,
+                fbccaConfig,
                 targetFrequency
             });
 
@@ -60,16 +61,16 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
                     selectedChannels,
                     startTime,
                     endTime,
-                    'TMSI Classifier',
-                    tmsiConfig,
+                    'FBCCA Classifier',
+                    fbccaConfig,
                     targetFrequency
                 );
 
                 setPlotImageUrl(result.image);
                 setMetadata(result.metadata);
-                console.log('✅ TMSIPlot: Successfully loaded classification plot');
+                console.log('✅ FBCCAPlot: Successfully loaded classification plot');
             } catch (err: any) {
-                console.error('❌ TMSIPlot: Failed to fetch classification plot:', err);
+                console.error('❌ FBCCAPlot: Failed to fetch classification plot:', err);
                 setError(err.response?.data?.detail || 'Failed to load classification plot');
             } finally {
                 setIsLoading(false);
@@ -85,9 +86,10 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
         timeWindow?.end,
         dataLength,
         samplingRate,
-        JSON.stringify(tmsiConfig.frequencies), // Stringify array for stable comparison
-        tmsiConfig.window_sec,
-        tmsiConfig.n_harmonics,
+        JSON.stringify(fbccaConfig.frequencies), // Stringify array for stable comparison
+        fbccaConfig.window_sec,
+        fbccaConfig.n_harmonics,
+        fbccaConfig.n_subbands,
         JSON.stringify(targetFrequency) // Stringify distinct target frequencies too
     ]);
 
@@ -107,10 +109,10 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
         );
     }
 
-    if (tmsiConfig.frequencies.length === 0) {
+    if (fbccaConfig.frequencies.length === 0) {
         return (
             <div ref={containerRef} className="h-64 flex items-center justify-center bg-gray-900/30 rounded-lg border border-gray-800">
-                <p className="text-sm text-gray-600">Configure TMSI frequencies to view plot</p>
+                <p className="text-sm text-gray-600">Configure FBCCA frequencies to view plot</p>
             </div>
         );
     }
@@ -119,7 +121,7 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
         <div ref={containerRef} className="h-full flex flex-col bg-gray-900/30 rounded-lg border border-gray-800 overflow-hidden">
             <div className="p-3 border-b border-gray-800">
                 <h4 className="text-xs font-medium text-gray-400">
-                    TMSI Classification ({selectedChannels.length} channel{selectedChannels.length !== 1 ? 's' : ''})
+                    FBCCA Classification ({selectedChannels.length} channel{selectedChannels.length !== 1 ? 's' : ''})
                 </h4>
                 {timeWindow && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -176,7 +178,7 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
                 ) : plotImageUrl ? (
                     <img
                         src={plotImageUrl}
-                        alt="TMSI classification plot"
+                        alt="FBCCA classification plot"
                         className="w-full h-auto"
                     />
                 ) : (
@@ -210,4 +212,4 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
     );
 };
 
-export default TMSIPlot;
+export default FBCCAPlot;

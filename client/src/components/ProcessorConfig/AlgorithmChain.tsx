@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ApiService, type Processor } from '../../api/client';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
-import { Trash2, Settings, Plus } from 'lucide-react';
+import { Trash2, Settings } from 'lucide-react';
 
 interface AlgorithmNode {
     id: string;
@@ -61,7 +61,9 @@ const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) 
             {/* Left Column: Chain Builder */}
             <div className="md:col-span-1 space-y-4">
                 <div className="card h-full flex flex-col">
-                    <h3 className="text-lg font-medium mb-4">Algorithm Chain</h3>
+                    <h3 className="text-2xl font-bold mb-8 flex items-center gap-4 text-white">
+                        Algorithm Chain
+                    </h3>
 
                     <div className="flex-1 space-y-2 overflow-y-auto mb-4">
                         {chain.length === 0 && (
@@ -73,30 +75,32 @@ const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) 
                             <div
                                 key={node.id}
                                 onClick={() => setSelectedNodeId(node.id)}
-                                className={`p-3 rounded border cursor-pointer flex items-center justify-between group transition-colors ${selectedNodeId === node.id
-                                    ? 'border-purple-500 bg-purple-500/10'
-                                    : 'border-gray-700 hover:border-gray-500 bg-gray-800'
+                                className={`p-5 rounded-xl border-2 cursor-pointer flex items-center justify-between group transition-all duration-200 mb-3 ${selectedNodeId === node.id
+                                    ? 'border-accent bg-slate-700 shadow-lg'
+                                    : 'border-transparent bg-slate-800 hover:bg-slate-700'
                                     }`}
                             >
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-mono text-gray-500">{index + 1}</span>
-                                    <span className="font-medium text-sm">{node.processor.name}</span>
+                                <div className="flex items-center gap-4">
+                                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-600 text-sm font-mono text-slate-300">
+                                        {index + 1}
+                                    </span>
+                                    <span className="font-bold text-xl text-white">{node.processor.name}</span>
                                 </div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); removeProcessor(node.id); }}
-                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-400 transition-opacity"
+                                    className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                                     title="Remove"
                                 >
-                                    <Trash2 size={14} />
+                                    <Trash2 size={24} />
                                 </button>
                             </div>
                         ))}
                     </div>
 
-                    <div className="pt-4 border-t border-gray-700">
-                        <label className="block text-xs font-medium text-gray-400 mb-2">Add Algorithm</label>
+                    <div className="pt-6 border-t border-slate-700">
+                        <label className="block text-sm font-bold text-slate-400 mb-3">ADD ALGORITHM</label>
                         <select
-                            className="w-full mb-2"
+                            className="w-full mb-2 h-16 text-lg bg-slate-800 border-slate-700 hover:border-slate-500 transition-colors rounded-xl px-4"
                             onChange={(e) => {
                                 if (e.target.value) {
                                     addProcessor(e.target.value);
@@ -116,27 +120,27 @@ const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) 
             {/* Right Column: Configuration */}
             <div className="md:col-span-2">
                 <div className="card h-full">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-medium flex items-center gap-2">
-                            <Settings size={18} />
+                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-700">
+                        <h3 className="text-2xl font-bold flex items-center gap-4 text-white">
+                            <Settings size={32} />
                             Configuration
                         </h3>
                         {chain.length > 0 && (
                             <button
                                 onClick={() => onRun(chain)}
                                 disabled={isProcessing}
-                                className={`btn btn-primary ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`btn btn-primary px-8 py-4 text-xl ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                {isProcessing ? 'Processing...' : 'Run Analysis'}
+                                {isProcessing ? 'PROCESSING...' : 'RUN ANALYSIS'}
                             </button>
                         )}
                     </div>
 
                     {selectedNode ? (
                         <div className="prose prose-invert max-w-none">
-                            <div className="mb-4">
-                                <h4 className="text-md font-medium text-purple-400">{selectedNode.processor.name}</h4>
-                                <p className="text-sm text-gray-400">{selectedNode.processor.description}</p>
+                            <div className="mb-8">
+                                <h4 className="text-2xl font-bold text-accent mb-2">{selectedNode.processor.name}</h4>
+                                <p className="text-lg text-slate-400">{selectedNode.processor.description}</p>
                             </div>
 
                             <div className="form-container">

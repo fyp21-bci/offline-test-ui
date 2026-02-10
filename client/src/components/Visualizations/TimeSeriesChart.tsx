@@ -91,7 +91,7 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             xaxis: {
                 showgrid: true,
                 zeroline: false,
-                gridcolor: '#374151',
+                gridcolor: '#333333',
                 anchor: n > 1 ? `y${n}` : 'y',
                 // Preserve xaxis state - use datasetId for stability
                 uirevision: `dataset-${datasetId}`,
@@ -122,7 +122,7 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
             subplotsLayout[axisName] = {
                 domain: [bottom, top],
                 showgrid: true,
-                gridcolor: '#333',
+                gridcolor: '#333333',
                 zeroline: false,
                 title: channels[i],
                 titlefont: { size: 10 },
@@ -169,7 +169,7 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                         y0: 0,
                         y1: 1,
                         fillcolor: 'rgba(0,0,0,0)',
-                        line: { color: '#a855f7', width: 2 },
+                        line: { color: '#0ea5e9', width: 2 }, // Sky 500
                     });
                 }
             });

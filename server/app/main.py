@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
+from app.api.streaming_routes import router as streaming_router
 
 app = FastAPI(
     title="Modular Signal Processing Server",
@@ -25,6 +26,9 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(streaming_router)
+
+
 
 if __name__ == "__main__":
     import uvicorn

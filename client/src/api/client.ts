@@ -130,21 +130,22 @@ export const ApiService = {
         return imageUrl;
     },
 
-    // TMSI Classification Plot
+    // Classification Plot (Generic)
     getClassificationPlot: async (
         datasetId: string,
         channels: number[],
         timeStart: number,
         timeEnd: number,
+        processorName: string,
         processorConfig: {
             frequencies: number[];
             window_sec: number;
             n_harmonics: number;
-            [key: string]: any; // Allow other props but filter them out
+            [key: string]: any; // Allow other props
         },
         targetFrequency?: number | number[]
     ): Promise<{ image: string; metadata: any }> => {
-        console.log('🌐 API: Requesting TMSI classification plot:', {
+        console.log(`🌐 API: Requesting ${processorName} plot:`, {
             datasetId,
             channels,
             timeStart,
@@ -153,24 +154,43 @@ export const ApiService = {
             targetFrequency
         });
 
-        // Extract only the fields expected by the backend for processor_config
-        const { frequencies, window_sec, n_harmonics } = processorConfig;
-
         const response = await api.post('/datasets/plot-classification', {
             dataset_id: datasetId,
             channels,
             time_start: timeStart,
             time_end: timeEnd,
-            processor_name: 'TMSI Classifier',
-            processor_config: {
-                frequencies,
-                window_sec,
-                n_harmonics
-            },
+            processor_name: processorName,
+            processor_config: processorConfig,
             target_frequency: targetFrequency
         });
 
         console.log('🌐 API: Classification plot received successfully');
         return response.data;
+    },
+    // Streaming
+    startStream: async (config: {
+        window_size?: number;
+        update_interval?: number;
+        channels?: number[];
+        tmsi_config?: {
+            frequencies: number[];
+            target_frequency?: number | number[] | null;
+            n_harmonics?: number;
+        };
+    } = {}): Promise<{ status: string; message: string }> => {
+        const response = await api.post('/stream/start', config);
+        return response.data;
+    },
+
+    stopStream: async (): Promise<{ status: string; message: string }> => {
+        const response = await api.post('/stream/stop');
+        return response.data;
+    },
+
+    // WebSocket URL helper
+    getStreamWebSocketURL: (): string => {
+        // Replace http/https with ws/wss based on API_BASE_URL
+        const baseUrl = API_BASE_URL.replace(/^http/, 'ws');
+        return `${baseUrl}/ws/stream`;
     },
 };

@@ -34,10 +34,10 @@ const HorizontalChannelControls: React.FC<HorizontalChannelControlsProps> = ({
         <div className="flex flex-wrap items-center gap-5 mb-4">
             <button
                 onClick={() => onToggleAll(!allVisible)}
-                className="btn btn-outline text-sm px-3 py-1.5 flex items-center gap-2 mr-5"
+                className="btn btn-outline text-sm px-5 py-3 flex items-center gap-2 mr-8 hover:bg-slate-700 border-2 rounded-lg font-bold uppercase tracking-wide"
             >
-                {allVisible ? <Eye size={14} /> : <EyeOff size={14} />}
-                <span className="whitespace-nowrap">{allVisible ? 'Hide All' : 'Show All'}</span>
+                {allVisible ? <Eye size={16} /> : <EyeOff size={16} />}
+                <span className="whitespace-nowrap">{allVisible ? 'HIDE ALL' : 'SHOW ALL'}</span>
             </button>
 
             {channels.map((ch, index) => {
@@ -49,25 +49,27 @@ const HorizontalChannelControls: React.FC<HorizontalChannelControlsProps> = ({
                         key={ch}
                         onClick={() => onToggle(ch)}
                         style={isVisible ? {
-                            backgroundColor: color,
+                            backgroundColor: `${color}20`, // 20% opacity
                             borderColor: color,
-                            color: '#FFFFFF'
+                            color: '#FFFFFF',
+                            boxShadow: `0 0 10px ${color}40`
                         } : {
                             color: color,
-                            borderColor: color
+                            borderColor: `${color}40` // dim border
                         }}
                         className={`
-                            btn btn-outline text-sm px-3 py-1.5 flex items-center gap-2
-                            ${!isVisible && 'hover:brightness-110 bg-transparent'}
+                            btn btn-outline text-sm px-5 py-3 flex items-center gap-2
+                            transition-all duration-200 uppercase tracking-widest font-bold border-2 rounded-lg
+                            ${!isVisible && 'hover:bg-slate-800 opacity-60 hover:opacity-100'}
                         `}
                     >
                         <span className="whitespace-nowrap">{ch}</span>
                         {isVisible ? (
-                            <Eye size={14} className="opacity-80" />
+                            <Eye size={14} className="drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" />
                         ) : (
                             <div
                                 className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: color }}
+                                style={{ backgroundColor: color, boxShadow: `0 0 5px ${color}` }}
                                 title="Channel Color"
                             />
                         )}

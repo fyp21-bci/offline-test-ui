@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 
-interface TMSIConfigProps {
+interface FBCCAConfigProps {
+    title?: string;
     onConfigChange: (config: {
         frequencies: number[];
         window_sec: number;
         n_harmonics: number;
+        n_subbands: number;
         target_frequency: number | number[] | null;
     }) => void;
 }
 
-const TMSIConfig: React.FC<TMSIConfigProps> = ({ onConfigChange }) => {
+const FBCCAConfig: React.FC<FBCCAConfigProps> = ({ title, onConfigChange }) => {
     const [frequenciesInput, setFrequenciesInput] = useState('7.0, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0');
     const [windowSec, setWindowSec] = useState(1.0);
     const [nHarmonics, setNHarmonics] = useState(5);
+    const [nSubbands, setNSubbands] = useState(5);
     const [targetFrequency, setTargetFrequency] = useState<string>('');
 
     const handleApplyConfig = () => {
@@ -42,17 +45,18 @@ const TMSIConfig: React.FC<TMSIConfigProps> = ({ onConfigChange }) => {
                 frequencies,
                 window_sec: windowSec,
                 n_harmonics: nHarmonics,
+                n_subbands: nSubbands,
                 target_frequency: parsedTarget
             });
         } catch (err) {
-            console.error('Failed to parse TMSI configuration:', err);
+            console.error('Failed to parse FBCCA configuration:', err);
         }
     };
 
     return (
         <div className="card h-full flex flex-col">
             <h3 className="text-2xl font-bold mb-8 text-white flex items-center gap-3">
-                TMSI Configuration
+                {title || 'FBCCA Configuration'}
             </h3>
 
             {/* Frequencies */}
@@ -90,7 +94,7 @@ const TMSIConfig: React.FC<TMSIConfigProps> = ({ onConfigChange }) => {
             </div>
 
             {/* Window Size */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4 mt-4">
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">
                         Window Size (s)
@@ -123,7 +127,25 @@ const TMSIConfig: React.FC<TMSIConfigProps> = ({ onConfigChange }) => {
                         step="1"
                     />
                     <p className="text-[10px] text-gray-500 mt-1">
-                        Number of harmonics to use for SSVEP detection
+                        Harmonics for reference signals
+                    </p>
+                </div>
+
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">
+                        Sub-bands
+                    </label>
+                    <input
+                        type="number"
+                        value={nSubbands}
+                        onChange={(e) => setNSubbands(parseInt(e.target.value) || 5)}
+                        className="w-full text-base bg-zinc-900/50 border-white/10 focus:border-purple-500 h-12"
+                        min="1"
+                        max="10"
+                        step="1"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1">
+                        Number of frequency sub-bands
                     </p>
                 </div>
 
@@ -135,10 +157,10 @@ const TMSIConfig: React.FC<TMSIConfigProps> = ({ onConfigChange }) => {
                 className="w-full py-5 px-8 bg-accent text-white rounded-xl text-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all mt-8 uppercase tracking-wide"
                 style={{ backgroundColor: 'var(--accent-color)' }}
             >
-                APPLY CONFIGURATION
+                APPLY FBCCA CONFIGURATION
             </button>
         </div >
     );
 };
 
-export default TMSIConfig;
+export default FBCCAConfig;
