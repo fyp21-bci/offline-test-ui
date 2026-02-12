@@ -16,6 +16,11 @@ from app.modules.processors.preprocessing import PreprocessingProcessor
 import base64
 from io import BytesIO
 import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
+import matplotlib.pyplot as plt
+from pathlib import Path
+import pandas as pd
 from app.core.plotting import plot_time_domain, plot_frequency_domain, plot_classification
 
 # Configure logging
@@ -57,6 +62,12 @@ class StreamManager:
         # Config
         self.params = BrainFlowInputParams()
         self.board_id = BoardIds.CYTON_BOARD.value
+        
+        # Recording
+        self.is_recording = False
+        self.recording_buffer = [] # List of numpy arrays
+        self.recording_start_time = 0
+        self.recording_filename = ""
 
     async def connect_client(self, websocket):
         """Register a new websocket client."""
@@ -97,8 +108,9 @@ class StreamManager:
         channels: Optional[List[int]] = None,
         target_frequency: Optional[float] = None,
         candidate_frequencies: Optional[List[float]] = None,
-        processor_name: str = "TMSI Classifier",
-        processor_config: Optional[Dict[str, Any]] = None
+        processors: List[str] = ["TMSI Classifier"],
+        processor_configs: Optional[Dict[str, Dict[str, Any]]] = None,
+        classification_window_size: Optional[float] = None
     ):
         """Start the BrainFlow streaming and processing threads."""
         with self.lock:
@@ -113,11 +125,25 @@ class StreamManager:
             
             use_board_id = board_id if board_id is not None else self.board_id
             
-            self.board = BoardShim(use_board_id, self.params)
+            print(f"DEBUG: Attempting to start stream. Serial: {serial_port}, Board ID: {use_board_id}")
+            logger.info(f"DEBUG: Attempting to start stream. Serial: {serial_port}, Board ID: {use_board_id}")
+
+            try:
+                self.board = BoardShim(use_board_id, self.params)
+            except Exception as e:
+                print(f"DEBUG: Error creating BoardShim: {e}")
+                logger.error(f"Error creating BoardShim: {e}")
+                raise e
+
             
             try:
+                print("DEBUG: Calling prepare_session()...")
                 self.board.prepare_session()
+                print("DEBUG: prepare_session() successful.")
+
+                print("DEBUG: Calling start_stream()...")
                 self.board.start_stream()
+                print("DEBUG: start_stream() successful.")
                 self.sampling_rate = self.board.get_sampling_rate(self.board_id)
                 self.n_channels = self.board.get_num_rows(self.board_id) # Total channels including accel etc.
                 self.eeg_channels = self.board.get_eeg_channels(self.board_id)
@@ -127,9 +153,10 @@ class StreamManager:
                 self.target_frequency = target_frequency
                 self.candidate_frequencies = candidate_frequencies
                 
-                self.processor_name = processor_name
-                self.processor_config = processor_config or {}
-                
+                self.processors = processors
+                self.processor_configs = processor_configs or {}
+                self.classification_window_size = classification_window_size
+
                 # Initialize Buffer
                 # We need to store ALL channels to keep structure consistent, 
                 # but we'll mostly focus on EEG channels for processing.
@@ -154,6 +181,9 @@ class StreamManager:
                 self._cleanup_board()
                 raise e
 
+                self._cleanup_board()
+                raise e
+
     def stop_stream(self):
         """Stop streaming and cleanup."""
         with self.lock:
@@ -172,6 +202,146 @@ class StreamManager:
                 
             self._cleanup_board()
             logger.info("Stream stopped.")
+
+    def start_recording(self, filename: Optional[str] = None):
+        """Start recording data to memory buffer."""
+        with self.lock:
+            if not self.is_streaming:
+                raise Exception("Cannot record when stream is not running")
+            
+            if self.is_recording:
+                raise Exception("Already recording")
+                
+            self.is_recording = True
+            self.recording_buffer = []
+            self.recording_start_time = time.time()
+            
+            # Generate filename if not provided
+            if not filename:
+                timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+                filename = f"recording_{timestamp}"
+            
+            # Sanitize filename (basic)
+            filename = "".join(x for x in filename if (x.isalnum() or x in "._- "))
+            
+            # Ensure .txt extension
+            if not filename.endswith(".txt"):
+                filename += ".txt"
+            
+            # Use dedicated recordings directory
+            # We'll prepend 'recordings/' to filename for internal tracking
+            # The actual path resolution happens in _save_recording
+            self.recording_filename = f"recordings/{filename}"
+            logger.info(f"Started recording to {self.recording_filename}")
+            
+    def stop_recording(self):
+        """Stop recording and save to file."""
+        with self.lock:
+            if not self.is_recording:
+                return
+            
+            logger.info(f"Stopping recording... {len(self.recording_buffer)} chunks captured")
+            self.is_recording = False
+            
+            # Save data in background/thread to avoid blocking? 
+            # For now, save synchronously or quick thread
+            threading.Thread(target=self._save_recording, args=(self.recording_filename, self.recording_buffer)).start()
+            
+            self.recording_buffer = [] # Clear memory
+            
+    def _save_recording(self, relative_path, buffer):
+        """Save recorded buffer to OpenBCI compatible CSV."""
+        logger.info(f"Saving recording... chunks: {len(buffer)}")
+        try:
+            # Construct full path relative to data_store
+            # relative_path might be "recordings/foo.txt" or just "foo.txt"
+            full_path = Path("data_store") / relative_path
+            
+            # Ensure parent directory exists
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            if not buffer:
+                logger.warning("Empty recording buffer, nothing to save.")
+                return
+
+            # Combine all chunks: List of (n_channels, n_samples)
+            # Need to concatenate along axis 1 (time)
+            data = np.hstack(buffer)
+            
+            # OpenBCI Default Format:
+            # Sample Index, EXG Channel 0, EXG Channel 1, ... , EXG Channel 7, Accel Channel 0, ... , Others, Timestamp (Formatted)
+            # We need to construct this dataframe.
+            
+            # 1. Sample Index (0-255 repeating)
+            # We can generate synthetic if we don't have the raw package numbers easily directly from get_board_data unless we saved them specially.
+            # BrainFlow get_board_data returns rows. Row 0 is often package num.
+            # Let's check board details.
+            # Lets check board details.
+            if self.board_id != BoardIds.SYNTHETIC_BOARD.value:
+                # Use actual package num channel
+                pkg_row = BoardShim.get_package_num_channel(self.board_id)
+                sample_indices = data[pkg_row, :]
+            else:
+                 # Synthetic
+                sample_indices = np.arange(data.shape[1]) % 256
+                
+            # 2. EXG Channels
+            # We want to save ALL channels that BrainFlow provides to be safe, or just EXG?
+            # OpenBCI text format usually includes all.
+            # Let's save standard OpenBCI format if possible.
+            
+            import pandas as pd
+            
+            # Get channel names logic approx
+            # BrainFlow returns many channels. 
+            # Let's construct a DataFrame.
+            
+            df_dict = {}
+            df_dict["Sample Index"] = sample_indices
+            
+            # EXG Channels
+            eeg_channels = self.eeg_channels if hasattr(self, 'eeg_channels') else range(8)
+            for i, ch_idx in enumerate(eeg_channels):
+                 df_dict[f" EXG Channel {i}"] = data[ch_idx, :]
+                 
+            # Timestamp
+            # BrainFlow has a timestamp channel.
+            timestamp_row = BoardShim.get_timestamp_channel(self.board_id)
+            timestamps = data[timestamp_row, :]
+            
+            # Format timestamps to string? OpenBCI txt usually has "Timestamp (Formatted)" and "Timestamp" (unixtime)
+            # We'll just save formatted for compatibility with our loader
+            # Our loader looks for "Timestamp (Formatted)"
+            
+            # Vectorized datetime conversion
+            # timestamps are unix epoch
+            formatted_times = pd.to_datetime(timestamps, unit='s').strftime('%Y-%m-%d %H:%M:%S.%f')
+            df_dict[" Timestamp (Formatted)"] = formatted_times
+            df_dict[" Timestamp"] = timestamps
+            
+            # Create DF
+            df = pd.DataFrame(df_dict)
+            
+            # Header
+            header = [
+                "%OpenBCI Raw EEG Data",
+                f"%Board = {self.board_id}", # Or name
+                f"%Sample Rate = {int(self.sampling_rate)} Hz",
+                f"%First Packet Recept Time = {timestamps[0] if len(timestamps)>0 else 0}",
+                "%Header End"
+            ]
+            
+            # Write to file
+            with open(full_path, 'w') as f:
+                f.write('\n'.join(header) + '\n')
+                df.to_csv(f, index=False, float_format='%.6f')
+                
+            logger.info(f"Successfully saved recording to {full_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save recording: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _cleanup_board(self):
         """Release BrainFlow session."""
@@ -207,6 +377,12 @@ class StreamManager:
                         if current_samples > self.max_buffer_samples:
                             # Keep only the last N samples
                             self.data_buffer = self.data_buffer[:, -self.max_buffer_samples:]
+
+                    # Recording: Buffer raw data
+                    if self.is_recording:
+                         # Append copy to list. 
+                         # We append raw chunks. We'll merge them later.
+                         self.recording_buffer.append(data.copy())
                             
                 time.sleep(0.01) # Poll frequently to keep internal buffer empty
             except Exception as e:
@@ -223,12 +399,14 @@ class StreamManager:
         asyncio.set_event_loop(loop)
         
         # Initialize Processor
-        processor_class = Registry.get_processor(getattr(self, 'processor_name', "TMSI Classifier"))
-        if not processor_class:
-            logger.error(f"Processor {self.processor_name} not found, falling back to TMSI Classifier")
-            processor_class = Registry.get_processor("TMSI Classifier")
-            
-        processor_instance = processor_class() if processor_class else None
+        # Initialize Processors
+        active_instances = []
+        for p_name in getattr(self, 'processors', ["TMSI Classifier"]):
+            processor_class = Registry.get_processor(p_name)
+            if processor_class:
+                active_instances.append((p_name, processor_class()))
+            else:
+                logger.error(f"Processor {p_name} not found")
         
         while not self.stop_event.is_set():
             start_time = time.time()
@@ -300,9 +478,8 @@ class StreamManager:
                     avg_magnitude = np.mean(mag_filtered, axis=0)
                     
                     # 3. Classification
-                    classification_result = None
-                    # We run classification on the FULL window if it's large enough (e.g. >1s)
-                    # TMSI usually needs ~1s. 
+                    classification_results = {}
+                    
                     if n_samples >= int(self.sampling_rate):
                         # Create SignalData wrapper
                         sig_data = SignalData(
@@ -311,44 +488,37 @@ class StreamManager:
                             channel_names=plot_channel_names
                         )
                         
-                        # Use default frequencies if not set in start_stream (to be implemented), 
-                        # or just a standard SSVEP range.
-                        # For now, let's use a standard range or the input params.
-                        # We'll just use the default TMSI config but ensure window_sec matches our data
-                        
                         # Determine actual window length in seconds
                         actual_duration = n_samples / self.sampling_rate
                         
-                        # Determine frequencies to use
-                        use_freqs = self.candidate_frequencies if self.candidate_frequencies else [8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]
-                        
-                        # Determine actual window length in seconds
-                        actual_duration = n_samples / self.sampling_rate
-                        
-                        config = {
-                            "frequencies": use_freqs,
-                            "window_sec": actual_duration,
-                            "n_harmonics": 5
-                        }
-                        
-                        # Override with user config if provided
-                        if getattr(self, 'processor_config', None):
-                            config.update(self.processor_config)
-                        
-                        try:
-                            # We only want ONE result for the current window.
-                            # TMSIProcessor splits into windows. If we pass the whole buffer as one "window_sec",
-                            # it should produce one result.
-                            # BUT TMSIProcessor builds the Laplacian based on window_sec.
-                            # If we pass exactly the buffer length, it should work.
-                            
-                            if processor_instance:
-                                res = processor_instance.process(sig_data, config)
+                        for p_name, p_instance in active_instances:
+                            try:
+                                # Get config for this processor
+                                p_config = self.processor_configs.get(p_name, {})
+                                
+                                # Default config if missing
+                                if not p_config:
+                                    use_freqs = self.candidate_frequencies if self.candidate_frequencies else [8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]
+                                    
+                                    # Use configured classification window, fallback to actual buffer duration if not set
+                                    use_window = self.classification_window_size if self.classification_window_size else actual_duration
+
+                                    p_config = {
+                                        "frequencies": use_freqs,
+                                        "window_sec": use_window,
+                                        "n_harmonics": 5
+                                    }
+                                
+                                # Ensure window_sec matches actual data if not critical? 
+                                # Actually TMSI uses window_sec for Laplacian. 
+                                # Let's trust the config or override if needed.
+                                
+                                res = p_instance.process(sig_data, p_config)
                                 results_list = res.data.get("results", [])
                                 if results_list:
-                                    classification_result = results_list[-1] # Get latest
-                        except Exception as proc_e:
-                            logger.error(f"Classification failed: {proc_e}")
+                                    classification_results[p_name] = results_list[-1]
+                            except Exception as proc_e:
+                                logger.error(f"Classification failed for {p_name}: {proc_e}")
 
 
 
@@ -387,8 +557,8 @@ class StreamManager:
                         plt.close(fig2)
                         images_payload['fft_plot'] = "data:image/png;base64," + base64.b64encode(buf2.getvalue()).decode('utf-8')
                         
-                        # 4c. Classification Plot
-                        if classification_result:
+                        # 4c. Classification Plots
+                        if classification_results:
                             # Use configured target frequency for coloring (set)
                             target_freqs = set()
                             if self.target_frequency:
@@ -401,22 +571,41 @@ class StreamManager:
                                 channel_names=plot_channel_names
                             )
                             
-                            # We only have one result, but the plotter expects a list
-                            # The plotter highlights segments.
-                            
-                            fig3 = plot_classification(
-                                sig_data_for_plot,
-                                [classification_result], # List of 1
-                                0, # time_start
-                                n_samples/self.sampling_rate, # time_end
-                                list(range(n_channels)),
-                                plot_channel_names,
-                                target_frequencies=target_freqs if target_freqs else None
-                            )
-                            buf3 = BytesIO()
-                            fig3.savefig(buf3, format='png', dpi=100, bbox_inches='tight')
-                            plt.close(fig3)
-                            images_payload['classification_plot'] = "data:image/png;base64," + base64.b64encode(buf3.getvalue()).decode('utf-8')
+                            for p_name, result in classification_results.items():
+                                try:
+                                    # Use target frequency from this processor's config if available
+                                    p_config = self.processor_configs.get(p_name, {})
+                                    
+                                    # Update with classification window if missing (same logic as above)
+                                    if 'window_sec' not in p_config and self.classification_window_size:
+                                         p_config['window_sec'] = self.classification_window_size
+
+                                    p_target = p_config.get('target_frequency')
+                                    p_targets = set()
+                                    if p_target:
+                                        if isinstance(p_target, list):
+                                            p_targets.update(p_target)
+                                        else:
+                                            p_targets.add(p_target)
+                                    else:
+                                        p_targets = target_freqs # Fallback to global target
+                                        
+                                    fig3 = plot_classification(
+                                        sig_data_for_plot,
+                                        [result], # List of 1
+                                        0, # time_start
+                                        n_samples/self.sampling_rate, # time_end
+                                        list(range(n_channels)),
+                                        plot_channel_names,
+                                        target_frequencies=p_targets if p_targets else None,
+                                        title=f"{p_name} Output"
+                                    )
+                                    buf3 = BytesIO()
+                                    fig3.savefig(buf3, format='png', dpi=100, bbox_inches='tight')
+                                    plt.close(fig3)
+                                    images_payload[f'classification_plot_{p_name}'] = "data:image/png;base64," + base64.b64encode(buf3.getvalue()).decode('utf-8')
+                                except Exception as p_plot_e:
+                                    logger.error(f"Plotting failed for {p_name}: {p_plot_e}")
                             
                     except Exception as plot_e:
                         logger.error(f"Plotting failed: {plot_e}")
@@ -430,7 +619,7 @@ class StreamManager:
                             "freqs": freqs_filtered.tolist(),
                             "magnitude": avg_magnitude.tolist()
                         },
-                        "classification": classification_result,
+                        "classification": classification_results,
                         "plots": images_payload, # New field
                         "status": "streaming"
                     }
@@ -449,6 +638,8 @@ class StreamManager:
     def get_status(self):
         return {
             "is_streaming": self.is_streaming,
+            "is_recording": self.is_recording,
+            "recording_time": time.time() - self.recording_start_time if self.is_recording else 0,
             "port": self.params.serial_port,
             "window_size": self.window_size_seconds,
             "clients": len(self.active_websockets)

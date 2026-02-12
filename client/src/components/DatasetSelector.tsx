@@ -10,6 +10,7 @@ interface DatasetSelectorProps {
 const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onSelect, selectedId }) => {
     const [datasets, setDatasets] = useState<Dataset[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [filter, setFilter] = useState<'all' | 'upload' | 'recording'>('all');
 
     useEffect(() => {
         loadDatasets();
@@ -47,27 +48,58 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onSelect, selectedId 
                 </label>
             </div>
 
+            {/* Filter Tabs */}
+            <div className="flex gap-2 mb-4 bg-slate-900/50 p-1 rounded-lg">
+                <button
+                    onClick={() => setFilter('all')}
+                    className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${filter === 'all' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                    All
+                </button>
+                <button
+                    onClick={() => setFilter('upload')}
+                    className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${filter === 'upload' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                    Uploads
+                </button>
+                <button
+                    onClick={() => setFilter('recording')}
+                    className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${filter === 'recording' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                    Recordings
+                </button>
+            </div>
+
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                {datasets.length === 0 && (
-                    <p className="text-base text-gray-500 text-center py-6">No datasets found.</p>
-                )}
-                {datasets.map(ds => (
-                    <button
-                        key={ds.id}
-                        onClick={() => onSelect(ds.id)}
-                        className={`w-full text-left px-6 py-5 rounded-xl flex items-center justify-between transition-all duration-200 border-2 mb-2 ${selectedId === ds.id
-                            ? 'bg-accent border-accent text-black font-bold shadow-[0_0_20px_rgba(14,165,233,0.4)]'
-                            : 'bg-transparent border-transparent hover:bg-slate-800/50 text-white opacity-80 hover:opacity-100'
-                            }`}
-                        style={{
-                            backgroundColor: selectedId === ds.id ? 'var(--accent-color)' : 'transparent',
-                            color: selectedId === ds.id ? '#000000' : '#ffffff'
-                        }}
-                    >
-                        <span className="truncate text-xl font-medium">{ds.filename}</span>
-                        {selectedId === ds.id && <Check size={28} className="text-black" />}
-                    </button>
-                ))}
+                {datasets
+                    .filter(ds => filter === 'all' || ds.type === filter)
+                    .length === 0 && (
+                        <p className="text-base text-gray-500 text-center py-6">No datasets found.</p>
+                    )}
+                {datasets
+                    .filter(ds => filter === 'all' || ds.type === filter)
+                    .map(ds => (
+                        <button
+                            key={ds.id}
+                            onClick={() => onSelect(ds.id)}
+                            className={`w-full text-left px-6 py-5 rounded-xl flex items-center justify-between transition-all duration-200 border-2 mb-2 ${selectedId === ds.id
+                                ? 'bg-accent border-accent text-black font-bold shadow-[0_0_20px_rgba(14,165,233,0.4)]'
+                                : 'bg-transparent border-transparent hover:bg-slate-800/50 text-white opacity-80 hover:opacity-100'
+                                }`}
+                            style={{
+                                backgroundColor: selectedId === ds.id ? 'var(--accent-color)' : 'transparent',
+                                color: selectedId === ds.id ? '#000000' : '#ffffff'
+                            }}
+                        >
+                            <div className="flex flex-col overflow-hidden">
+                                <span className="truncate text-xl font-medium">{ds.filename}</span>
+                                <span className="text-xs uppercase font-bold text-slate-400 mt-1 opacity-70">
+                                    {ds.type === 'recording' ? 'Recording' : 'Upload'} • {(ds.size_bytes / 1024).toFixed(1)} KB
+                                </span>
+                            </div>
+                            {selectedId === ds.id && <Check size={28} className="text-black" />}
+                        </button>
+                    ))}
             </div>
         </div>
     );

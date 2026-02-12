@@ -47,17 +47,38 @@ async def get_processor_config(name: str):
 
 @router.get("/datasets", response_model=List[DatasetInfo])
 async def list_datasets():
-    """List uploaded datasets."""
+    """List uploaded datasets and recordings."""
     files = []
+    
+    # scan uploads (root of data_store)
     for f in DATA_DIR.glob("*"):
         if f.is_file():
-            # In a real app we'd verify it's a valid dataset or use a DB
             files.append(DatasetInfo(
                 id=f.name, 
                 filename=f.name, 
                 size_bytes=f.stat().st_size,
-                available_channels=[] # Expensive to calculate every time, skip for list
+                available_channels=[],
+                type="upload"
             ))
+            
+    # scan recordings (data_store/recordings)
+    recordings_dir = DATA_DIR / "recordings"
+    if recordings_dir.exists():
+        for f in recordings_dir.glob("*"):
+            if f.is_file():
+                # ID includes subfolder so file read can find it
+                # OR we just use name if we assume unique?
+                # Let's use relative path as ID for safety in retrieval
+                rel_path = f.relative_to(DATA_DIR)
+                files.append(DatasetInfo(
+                    id=str(rel_path),
+                    filename=f.name,
+                    size_bytes=f.stat().st_size,
+                    available_channels=[],
+                    type="recording"
+                ))
+                
+    return files
     return files
 
 @router.post("/datasets/upload", response_model=DatasetInfo)
@@ -74,7 +95,8 @@ async def upload_dataset(file: UploadFile = File(...)):
         id=file.filename,
         filename=file.filename,
         size_bytes=file_path.stat().st_size,
-        available_channels=[]
+        available_channels=[],
+        type="upload"
     )
 
 @router.post("/analysis/run", response_model=AnalysisResponse)
@@ -116,7 +138,7 @@ async def run_analysis(request: RunAnalysisRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/datasets/{dataset_id}/data")
+@router.get("/datasets/{dataset_id:path}/data")
 async def get_dataset_data(dataset_id: str, channel_idx: int | None = None):
     """
     Get raw signal data for a dataset.

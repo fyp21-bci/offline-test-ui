@@ -27,7 +27,7 @@ def plot_time_domain(
     fig, axes = plt.subplots(
         len(channel_indices), 
         1, 
-        figsize=(12, 2 * len(channel_indices)),
+        figsize=(16, 2 * len(channel_indices)),
         squeeze=False
     )
     
@@ -70,7 +70,7 @@ def plot_frequency_domain(
     fig, axes = plt.subplots(
         len(channel_indices), 
         1, 
-        figsize=(12, 2 * len(channel_indices)),
+        figsize=(16, 2 * len(channel_indices)),
         squeeze=False
     )
     
@@ -107,7 +107,8 @@ def plot_classification(
     time_end: float,
     channel_indices: List[int],
     channel_names: List[str],
-    target_frequencies: Optional[set[float]] = None
+    target_frequencies: Optional[set[float]] = None,
+    title: Optional[str] = None
 ) -> plt.Figure:
     """
     Generate a classification plot with color-coded backgrounds.
@@ -120,6 +121,7 @@ def plot_classification(
         channel_indices: List of channel indices to plot
         channel_names: List of all channel names
         target_frequencies: Optional set of target frequencies for correctness evaluation
+        title: Optional title for the plot
     
     Returns:
         matplotlib Figure object
@@ -130,9 +132,12 @@ def plot_classification(
     fig, axes = plt.subplots(
         len(channel_indices), 
         1, 
-        figsize=(12, 2 * len(channel_indices)),
+        figsize=(16, 2 * len(channel_indices)),
         squeeze=False
     )
+    
+    if title:
+        fig.suptitle(title, fontsize=14)
     
     for i, ch_idx in enumerate(channel_indices):
         ax = axes[i, 0]

@@ -10,7 +10,7 @@ interface TMSIConfigProps {
 }
 
 const TMSIConfig: React.FC<TMSIConfigProps> = ({ onConfigChange }) => {
-    const [frequenciesInput, setFrequenciesInput] = useState('7.0, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0');
+    const [frequenciesInput, setFrequenciesInput] = useState('7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0');
     const [windowSec, setWindowSec] = useState(1.0);
     const [nHarmonics, setNHarmonics] = useState(5);
     const [targetFrequency, setTargetFrequency] = useState<string>('');

@@ -16,14 +16,19 @@ class StreamStartRequest(BaseModel):
     window_size_seconds: float = 3.0
     update_interval_seconds: float = 1.0
     target_frequency: Optional[float] = None # Used for coloring
+    classification_window_size: Optional[float] = None # Window size for classification algorithms
     
     # New Configs
     channels: Optional[List[int]] = None # Indices to process/stream
     candidate_frequencies: Optional[List[float]] = None # For TMSI
     
     # Processor Selection
-    processor_name: str = "TMSI Classifier"
-    processor_config: Dict[str, Any] = {}
+    processors: List[str] = ["TMSI Classifier"]
+    processors: List[str] = ["TMSI Classifier"]
+    processor_configs: Dict[str, Dict[str, Any]] = {}
+
+class RecordStartRequest(BaseModel):
+    filename: Optional[str] = None
 
 @router.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):
@@ -40,8 +45,9 @@ async def start_stream(request: StreamStartRequest):
             channels=request.channels,
             target_frequency=request.target_frequency,
             candidate_frequencies=request.candidate_frequencies,
-            processor_name=request.processor_name,
-            processor_config=request.processor_config
+            processors=request.processors,
+            processor_configs=request.processor_configs,
+            classification_window_size=request.classification_window_size
         )
         return {"status": "success", "message": "Stream started"}
     except Exception as e:
@@ -55,3 +61,16 @@ async def stop_stream():
 @router.get("/stream/status")
 async def get_stream_status():
     return stream_manager.get_status()
+
+@router.post("/stream/record/start")
+async def start_recording(request: RecordStartRequest):
+    try:
+        stream_manager.start_recording(filename=request.filename)
+        return {"status": "success", "message": "Recording started", "filename": stream_manager.recording_filename}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/stream/record/stop")
+async def stop_recording():
+    stream_manager.stop_recording()
+    return {"status": "success", "message": "Recording stopped"}

@@ -12,6 +12,7 @@ export interface Dataset {
     id: string;
     filename: string;
     size_bytes: number;
+    type: 'upload' | 'recording';
 }
 
 export interface Processor {
@@ -184,6 +185,17 @@ export const ApiService = {
 
     stopStream: async (): Promise<{ status: string; message: string }> => {
         const response = await api.post('/stream/stop');
+        return response.data;
+    },
+
+    // Recording
+    startRecording: async (filename?: string): Promise<{ status: string; message: string; filename?: string }> => {
+        const response = await api.post('/stream/record/start', { filename });
+        return response.data;
+    },
+
+    stopRecording: async (): Promise<{ status: string; message: string }> => {
+        const response = await api.post('/stream/record/stop');
         return response.data;
     },
 
