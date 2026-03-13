@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ children, fullWidth = false }) => {
     return (
         <div className="layout-container">
             <header className="layout-header">
@@ -17,10 +17,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         <NavLink to="/realtime" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-accent text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
                             Real-Time Stream
                         </NavLink>
+                        <NavLink to="/game" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-accent text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                            Game Mode
+                        </NavLink>
                     </nav>
                 </div>
             </header>
-            <main className="main-content">
+            <main className="main-content" style={fullWidth ? { padding: 0 } : {}}>
                 {children}
             </main>
         </div>

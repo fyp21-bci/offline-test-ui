@@ -30,6 +30,22 @@ class StreamStartRequest(BaseModel):
 class RecordStartRequest(BaseModel):
     filename: Optional[str] = None
 
+class GameStreamStartRequest(BaseModel):
+    # Connection params
+    serial_port: str = "/dev/ttyUSB0"
+    board_id: Optional[int] = None
+    
+    # Configuration
+    window_length: float = 3.0 # Maps to classification_window_size
+    refresh_rate: float = 0.5 # Maps to update_interval_seconds
+    
+    # Algorithms
+    algorithms: List[str] = ["TMSI Classifier"] # Maps to processors
+    candidate_frequencies: Optional[List[float]] = None
+    
+    # Optional
+    channels: Optional[List[int]] = None
+
 @router.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):
     await stream_manager.connect_client(websocket)
@@ -74,3 +90,27 @@ async def start_recording(request: RecordStartRequest):
 async def stop_recording():
     stream_manager.stop_recording()
     return {"status": "success", "message": "Recording stopped"}
+
+@router.post("/stream/game/start")
+async def start_game_stream(request: GameStreamStartRequest):
+    try:
+        # Stop existing if any (optional, but good practice)
+        if stream_manager.is_streaming:
+             stream_manager.stop_stream()
+             
+        stream_manager.start_stream(
+            serial_port=request.serial_port,
+            board_id=request.board_id,
+            window_size=request.window_length, # Core buffer window
+            update_interval=request.refresh_rate,
+            channels=request.channels,
+            target_frequency=None, # Not used for game mode usually
+            candidate_frequencies=request.candidate_frequencies,
+            processors=request.algorithms,
+            processor_configs={}, # Default
+            classification_window_size=request.window_length,
+            generate_plots=False
+        )
+        return {"status": "success", "message": "Game stream started"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

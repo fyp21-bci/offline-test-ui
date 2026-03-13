@@ -188,6 +188,17 @@ export const ApiService = {
         return response.data;
     },
 
+    startGameStream: async (config: {
+        window_length: number;
+        refresh_rate: number;
+        algorithms: string[];
+        candidate_frequencies: number[];
+        channels?: number[];
+    }): Promise<{ status: string; message: string }> => {
+        const response = await api.post('/stream/game/start', config);
+        return response.data;
+    },
+
     // Recording
     startRecording: async (filename?: string): Promise<{ status: string; message: string; filename?: string }> => {
         const response = await api.post('/stream/record/start', { filename });

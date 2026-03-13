@@ -110,7 +110,8 @@ class StreamManager:
         candidate_frequencies: Optional[List[float]] = None,
         processors: List[str] = ["TMSI Classifier"],
         processor_configs: Optional[Dict[str, Dict[str, Any]]] = None,
-        classification_window_size: Optional[float] = None
+        classification_window_size: Optional[float] = None,
+        generate_plots: bool = True
     ):
         """Start the BrainFlow streaming and processing threads."""
         with self.lock:
@@ -156,6 +157,7 @@ class StreamManager:
                 self.processors = processors
                 self.processor_configs = processor_configs or {}
                 self.classification_window_size = classification_window_size
+                self.generate_plots = generate_plots
 
                 # Initialize Buffer
                 # We need to store ALL channels to keep structure consistent, 
@@ -528,84 +530,85 @@ class StreamManager:
                     images_payload = {}
                     
                     try:
-                        # 4a. Time Domain Plot
-                        # Use eeg_channels from board for labelling
-                        # If board not available (e.g. stopped?), fallback
-                        channel_names = [f"Ch{i+1}" for i in range(n_channels)]
-                        time_axis = np.linspace(0, n_samples/self.sampling_rate, n_samples)
-                        
-                        fig1 = plot_time_domain(
-                            eeg_data, 
-                            time_axis, 
-                            list(range(n_channels)), 
-                            channel_names
-                        )
-                        buf1 = BytesIO()
-                        fig1.savefig(buf1, format='png', dpi=100, bbox_inches='tight')
-                        plt.close(fig1)
-                        images_payload['time_plot'] = "data:image/png;base64," + base64.b64encode(buf1.getvalue()).decode('utf-8')
-                        
-                        # 4b. FFT Plot
-                        fig2 = plot_frequency_domain(
-                            eeg_data, 
-                            self.sampling_rate, 
-                            list(range(n_channels)), 
-                            plot_channel_names
-                        )
-                        buf2 = BytesIO()
-                        fig2.savefig(buf2, format='png', dpi=100, bbox_inches='tight')
-                        plt.close(fig2)
-                        images_payload['fft_plot'] = "data:image/png;base64," + base64.b64encode(buf2.getvalue()).decode('utf-8')
-                        
-                        # 4c. Classification Plots
-                        if classification_results:
-                            # Use configured target frequency for coloring (set)
-                            target_freqs = set()
-                            if self.target_frequency:
-                                target_freqs.add(self.target_frequency)
+                        if self.generate_plots:
+                            # 4a. Time Domain Plot
+                            # Use eeg_channels from board for labelling
+                            # If board not available (e.g. stopped?), fallback
+                            channel_names = [f"Ch{i+1}" for i in range(n_channels)]
+                            time_axis = np.linspace(0, n_samples/self.sampling_rate, n_samples)
                             
-                            # SignalData wrapper again if we didn't save it
-                            sig_data_for_plot = SignalData(
-                                data=eeg_data.tolist(),
-                                fs=self.sampling_rate,
-                                channel_names=plot_channel_names
+                            fig1 = plot_time_domain(
+                                eeg_data, 
+                                time_axis, 
+                                list(range(n_channels)), 
+                                channel_names
                             )
+                            buf1 = BytesIO()
+                            fig1.savefig(buf1, format='png', dpi=100, bbox_inches='tight')
+                            plt.close(fig1)
+                            images_payload['time_plot'] = "data:image/png;base64," + base64.b64encode(buf1.getvalue()).decode('utf-8')
                             
-                            for p_name, result in classification_results.items():
-                                try:
-                                    # Use target frequency from this processor's config if available
-                                    p_config = self.processor_configs.get(p_name, {})
-                                    
-                                    # Update with classification window if missing (same logic as above)
-                                    if 'window_sec' not in p_config and self.classification_window_size:
-                                         p_config['window_sec'] = self.classification_window_size
-
-                                    p_target = p_config.get('target_frequency')
-                                    p_targets = set()
-                                    if p_target:
-                                        if isinstance(p_target, list):
-                                            p_targets.update(p_target)
-                                        else:
-                                            p_targets.add(p_target)
-                                    else:
-                                        p_targets = target_freqs # Fallback to global target
+                            # 4b. FFT Plot
+                            fig2 = plot_frequency_domain(
+                                eeg_data, 
+                                self.sampling_rate, 
+                                list(range(n_channels)), 
+                                plot_channel_names
+                            )
+                            buf2 = BytesIO()
+                            fig2.savefig(buf2, format='png', dpi=100, bbox_inches='tight')
+                            plt.close(fig2)
+                            images_payload['fft_plot'] = "data:image/png;base64," + base64.b64encode(buf2.getvalue()).decode('utf-8')
+                            
+                            # 4c. Classification Plots
+                            if classification_results:
+                                # Use configured target frequency for coloring (set)
+                                target_freqs = set()
+                                if self.target_frequency:
+                                    target_freqs.add(self.target_frequency)
+                                
+                                # SignalData wrapper again if we didn't save it
+                                sig_data_for_plot = SignalData(
+                                    data=eeg_data.tolist(),
+                                    fs=self.sampling_rate,
+                                    channel_names=plot_channel_names
+                                )
+                                
+                                for p_name, result in classification_results.items():
+                                    try:
+                                        # Use target frequency from this processor's config if available
+                                        p_config = self.processor_configs.get(p_name, {})
                                         
-                                    fig3 = plot_classification(
-                                        sig_data_for_plot,
-                                        [result], # List of 1
-                                        0, # time_start
-                                        n_samples/self.sampling_rate, # time_end
-                                        list(range(n_channels)),
-                                        plot_channel_names,
-                                        target_frequencies=p_targets if p_targets else None,
-                                        title=f"{p_name} Output"
-                                    )
-                                    buf3 = BytesIO()
-                                    fig3.savefig(buf3, format='png', dpi=100, bbox_inches='tight')
-                                    plt.close(fig3)
-                                    images_payload[f'classification_plot_{p_name}'] = "data:image/png;base64," + base64.b64encode(buf3.getvalue()).decode('utf-8')
-                                except Exception as p_plot_e:
-                                    logger.error(f"Plotting failed for {p_name}: {p_plot_e}")
+                                        # Update with classification window if missing (same logic as above)
+                                        if 'window_sec' not in p_config and self.classification_window_size:
+                                             p_config['window_sec'] = self.classification_window_size
+
+                                        p_target = p_config.get('target_frequency')
+                                        p_targets = set()
+                                        if p_target:
+                                            if isinstance(p_target, list):
+                                                p_targets.update(p_target)
+                                            else:
+                                                p_targets.add(p_target)
+                                        else:
+                                            p_targets = target_freqs # Fallback to global target
+                                            
+                                        fig3 = plot_classification(
+                                            sig_data_for_plot,
+                                            [result], # List of 1
+                                            0, # time_start
+                                            n_samples/self.sampling_rate, # time_end
+                                            list(range(n_channels)),
+                                            plot_channel_names,
+                                            target_frequencies=p_targets if p_targets else None,
+                                            title=f"{p_name} Output"
+                                        )
+                                        buf3 = BytesIO()
+                                        fig3.savefig(buf3, format='png', dpi=100, bbox_inches='tight')
+                                        plt.close(fig3)
+                                        images_payload[f'classification_plot_{p_name}'] = "data:image/png;base64," + base64.b64encode(buf3.getvalue()).decode('utf-8')
+                                    except Exception as p_plot_e:
+                                        logger.error(f"Plotting failed for {p_name}: {p_plot_e}")
                             
                     except Exception as plot_e:
                         logger.error(f"Plotting failed: {plot_e}")
