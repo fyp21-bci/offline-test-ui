@@ -94,19 +94,19 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onSelect, selectedId 
                         <button
                             key={ds.id}
                             onClick={() => onSelect(ds.id)}
-                            className={`w-full text-left px-4 py-4 rounded-lg flex items-center justify-between transition-all duration-200 border ${
+                            className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-all duration-200 border-2 ${
                                 selectedId === ds.id
                                     ? 'bg-accent border-accent text-black font-semibold shadow-lg'
-                                    : 'bg-bg-tertiary border-border-color hover:border-accent hover:bg-bg-active text-primary'
+                                    : 'bg-bg-secondary border-border-dark hover:border-accent hover:shadow-md text-primary'
                             }`}
                         >
-                            <div className="flex flex-col overflow-hidden flex-1">
-                                <span className="truncate text-base font-semibold">{ds.filename}</span>
-                                <span className={`text-xs font-medium mt-1 ${selectedId === ds.id ? 'text-black/70' : 'text-tertiary'}`}>
-                                    {ds.type === 'recording' ? 'Recording' : 'Upload'} • {(ds.size_bytes / 1024).toFixed(1)} KB
+                            <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+                                <span className="truncate text-base font-semibold leading-tight">{ds.filename}</span>
+                                <span className={`text-xs font-medium mt-1.5 ${selectedId === ds.id ? 'text-black/60' : 'text-secondary'}`}>
+                                    {ds.type === 'recording' ? '🔴 Recording' : '📤 Upload'} • {(ds.size_bytes / 1024).toFixed(1)} KB
                                 </span>
                             </div>
-                            {selectedId === ds.id && <Check size={22} className="ml-3 flex-shrink-0" />}
+                            {selectedId === ds.id && <Check size={22} className="ml-3 flex-shrink-0 text-black" />}
                         </button>
                     ))}
             </div>

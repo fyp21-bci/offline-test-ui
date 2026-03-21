@@ -10,36 +10,42 @@ const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ 
                         <div className="status-dot" />
                         <h1 className="brand-text text-2xl font-bold tracking-tight">Signal Studio</h1>
                     </div>
-                    <nav className="nav-links flex gap-2">
+                    <nav className="nav-links flex gap-3">
                         <NavLink 
                             to="/" 
-                            className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                            className={({ isActive }) => `px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 inline-flex items-center gap-2 relative ${
                                 isActive 
-                                    ? 'bg-cyan-500 text-black shadow-lg hover:shadow-xl' 
-                                    : 'text-secondary hover:text-accent hover:bg-hover'
+                                    ? 'bg-accent text-black shadow-lg hover:shadow-xl scale-105' 
+                                    : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
                             }`}
                         >
-                            Offline Analysis
+                            <span>📊</span>
+                            <span>Offline Analysis</span>
+                            {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
                         </NavLink>
                         <NavLink 
                             to="/realtime" 
-                            className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                            className={({ isActive }) => `px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 inline-flex items-center gap-2 relative ${
                                 isActive 
-                                    ? 'bg-cyan-500 text-black shadow-lg hover:shadow-xl' 
-                                    : 'text-secondary hover:text-accent hover:bg-hover'
+                                    ? 'bg-accent text-black shadow-lg hover:shadow-xl scale-105' 
+                                    : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
                             }`}
                         >
-                            Real-Time Stream
+                            <span>⚡</span>
+                            <span>Real-Time Stream</span>
+                            {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
                         </NavLink>
                         <NavLink 
                             to="/game" 
-                            className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                            className={({ isActive }) => `px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 inline-flex items-center gap-2 relative ${
                                 isActive 
-                                    ? 'bg-cyan-500 text-black shadow-lg hover:shadow-xl' 
-                                    : 'text-secondary hover:text-accent hover:bg-hover'
+                                    ? 'bg-accent text-black shadow-lg hover:shadow-xl scale-105' 
+                                    : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
                             }`}
                         >
-                            Game Mode
+                            <span>🎮</span>
+                            <span>Game Mode</span>
+                            {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
                         </NavLink>
                     </nav>
                 </div>
