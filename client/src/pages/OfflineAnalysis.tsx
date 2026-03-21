@@ -195,34 +195,34 @@ function OfflineAnalysis() {
 
                         {/* Overlay Toggle */}
                         {availableChannels.length > 0 && (
-                            <div className="card p-4 flex items-center justify-between mt-4 bg-slate-800 border-none">
-                                <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">Analysis Overlay</span>
+                            <div className="card p-4 flex items-center justify-between">
+                                <span className="text-sm font-semibold text-secondary uppercase tracking-wide">Analysis Overlay</span>
                                 <button
                                     role="switch"
                                     aria-checked={showOverlay}
                                     onClick={() => setShowOverlay(!showOverlay)}
-                                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-slate-900 ${showOverlay ? 'bg-accent shadow-[0_0_15px_rgba(14,165,233,0.4)]' : 'bg-slate-700'
+                                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-primary ${showOverlay ? 'bg-accent shadow-lg' : 'bg-bg-tertiary'
                                         }`}
                                 >
                                     <span
                                         className={`${showOverlay ? 'translate-x-7' : 'translate-x-1'
-                                            } inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-md`}
+                                            } inline-block h-6 w-6 transform rounded-full bg-primary transition-transform shadow-md`}
                                     />
                                 </button>
                             </div>
                         )}
                     </div>
 
-                    <div className="card p-6">
-                        <label className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 block">Expected Target (Hz)</label>
+                    <div className="card">
+                        <label className="text-sm font-semibold text-secondary uppercase tracking-wide mb-3 block">Expected Target (Hz)</label>
                         <input
                             type="number"
                             value={targetFrequency}
                             onChange={(e) => setTargetFrequency(Number(e.target.value))}
-                            className="w-full text-lg bg-slate-800 border-slate-700 focus:border-accent h-16 rounded-xl"
+                            className="w-full text-lg bg-bg-tertiary border-border-color focus:border-accent h-12 rounded-lg"
                             placeholder="e.g., 10"
                         />
-                        <p className="text-xs text-slate-500 mt-3 font-medium">
+                        <p className="text-xs text-tertiary mt-3 font-medium">
                             Used to color-code classification accuracy in the time series view.
                         </p>
                     </div>
@@ -269,7 +269,7 @@ function OfflineAnalysis() {
 
                             {/* Plotly Interactive Chart */}
                             <div className="card flex flex-col min-h-0">
-                                <h3 className="text-sm font-medium text-gray-400 mb-2">Interactive View (Plotly)</h3>
+                                <h3 className="text-sm font-semibold text-secondary mb-3 uppercase tracking-wide">Interactive View (Plotly)</h3>
                                 <div className="flex-1 min-h-0 overflow-auto">
                                     {rawSignalData.length > 0 ? (
                                         <TimeSeriesChart

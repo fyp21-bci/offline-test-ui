@@ -8,16 +8,37 @@ const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ 
                 <div className="header-content">
                     <div className="brand">
                         <div className="status-dot" />
-                        <h1 className="brand-text">Signal Studio</h1>
+                        <h1 className="brand-text text-2xl font-bold tracking-tight">Signal Studio</h1>
                     </div>
-                    <nav className="nav-links flex gap-4">
-                        <NavLink to="/" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-accent text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                    <nav className="nav-links flex gap-2">
+                        <NavLink 
+                            to="/" 
+                            className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                                isActive 
+                                    ? 'bg-cyan-500 text-black shadow-lg hover:shadow-xl' 
+                                    : 'text-secondary hover:text-accent hover:bg-hover'
+                            }`}
+                        >
                             Offline Analysis
                         </NavLink>
-                        <NavLink to="/realtime" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-accent text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                        <NavLink 
+                            to="/realtime" 
+                            className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                                isActive 
+                                    ? 'bg-cyan-500 text-black shadow-lg hover:shadow-xl' 
+                                    : 'text-secondary hover:text-accent hover:bg-hover'
+                            }`}
+                        >
                             Real-Time Stream
                         </NavLink>
-                        <NavLink to="/game" className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-accent text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                        <NavLink 
+                            to="/game" 
+                            className={({ isActive }) => `px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                                isActive 
+                                    ? 'bg-cyan-500 text-black shadow-lg hover:shadow-xl' 
+                                    : 'text-secondary hover:text-accent hover:bg-hover'
+                            }`}
+                        >
                             Game Mode
                         </NavLink>
                     </nav>

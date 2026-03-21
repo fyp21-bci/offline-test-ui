@@ -233,7 +233,7 @@ function RealTimeAnalysis() {
         <Layout>
             <div className="h-[calc(100vh-8rem)] flex flex-col gap-4 p-4 overflow-hidden">
                 {/* Header / Config Bar */}
-                <div className={`bg-slate-800 rounded-lg border border-slate-700 flex flex-col transition-all duration-300 ${isConfigExpanded ? 'max-h-[600px] p-4' : 'max-h-[70px] p-2'}`}>
+                <div className={`bg-bg-tertiary rounded-lg border border-border-color flex flex-col transition-all duration-300 ${isConfigExpanded ? 'max-h-[600px] p-4' : 'max-h-[70px] p-2'}`}>
 
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-4">
@@ -315,11 +315,11 @@ function RealTimeAnalysis() {
                     <div className={`flex flex-col gap-6 overflow-y-auto ${!isConfigExpanded && 'hidden'}`}>
 
                         {/* Global Settings Row */}
-                        <div className="flex flex-col lg:flex-row gap-6 p-4 bg-slate-900/50 rounded-lg border border-slate-700/50">
+                        <div className="flex flex-col lg:flex-row gap-6 p-4 bg-bg-hover rounded-lg border border-border-light">
 
                             {/* Refresh Rate */}
                             <div className="min-w-[150px]">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Refresh Rate (s)</label>
+                                <label className="text-xs font-bold text-tertiary uppercase block mb-2 tracking-wide">Refresh Rate (s)</label>
                                 <input
                                     type="number"
                                     value={refreshRate}
@@ -327,13 +327,13 @@ function RealTimeAnalysis() {
                                     step="0.1"
                                     min="0.1"
                                     max="5.0"
-                                    className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:border-accent outline-none"
+                                    className="w-full bg-bg-tertiary border border-border-color rounded px-2 py-2 text-primary text-sm focus:border-accent outline-none transition-colors"
                                 />
                             </div>
 
                             {/* Classification Window Size */}
                             <div className="min-w-[150px]">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Window Size (s)</label>
+                                <label className="text-xs font-bold text-tertiary uppercase block mb-2 tracking-wide">Window Size (s)</label>
                                 <input
                                     type="number"
                                     value={classificationWindow}
@@ -341,7 +341,7 @@ function RealTimeAnalysis() {
                                     step="0.1"
                                     min="0.1"
                                     max="5.0"
-                                    className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:border-accent outline-none"
+                                    className="w-full bg-bg-tertiary border border-border-color rounded px-2 py-2 text-primary text-sm focus:border-accent outline-none transition-colors"
                                 />
                             </div>
 
