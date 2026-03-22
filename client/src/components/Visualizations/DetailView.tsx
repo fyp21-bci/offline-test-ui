@@ -34,6 +34,8 @@ const DetailView: React.FC<DetailViewProps> = ({
         };
     }, [plotImageUrl]);
 
+    const abortControllerRef = React.useRef<AbortController | null>(null);
+
     // Fetch plot when dataset, channels, or time window changes
     useEffect(() => {
         const fetchPlot = async () => {
@@ -41,6 +43,12 @@ const DetailView: React.FC<DetailViewProps> = ({
                 setPlotImageUrl(null);
                 return;
             }
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const newController = new AbortController();
+            abortControllerRef.current = newController;
 
             // Calculate time window: use provided window or full range
             const startTime = timeWindow ? timeWindow.start : 0;
@@ -54,18 +62,31 @@ const DetailView: React.FC<DetailViewProps> = ({
                     datasetId,
                     selectedChannels,
                     startTime,
-                    endTime
+                    endTime,
+                    undefined,
+                    'time',
+                    newController.signal
                 );
-                setPlotImageUrl(imageUrl);
+                if (imageUrl) {
+                    setPlotImageUrl(imageUrl);
+                }
             } catch (error: any) {
                 console.error('Failed to fetch plot image:', error);
                 setPlotError(error.response?.data?.detail || 'Failed to load plot image');
             } finally {
-                setIsLoadingPlot(false);
+                if (abortControllerRef.current === newController) {
+                    setIsLoadingPlot(false);
+                }
             }
         };
 
         fetchPlot();
+
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [datasetId, selectedChannels, timeWindow, dataLength, samplingRate]);
 
     // Parse Spectrum Data

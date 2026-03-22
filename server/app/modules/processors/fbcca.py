@@ -49,6 +49,7 @@ class FBCCAProcessor(Processor):
         window_sec = config.get("window_sec", 1.0)
         n_harmonics = config.get("n_harmonics", 5)
         n_subbands = config.get("n_subbands", 5)
+        step_sec = config.get("step_sec", window_sec)
         
         signal_matrix = np.array(data.data)
         fs = int(data.fs)
@@ -67,7 +68,8 @@ class FBCCAProcessor(Processor):
              # Or return empty? The TMSI impl iterates range so it would likely skip.
              pass
 
-        for start_idx in range(0, n_samples - target_samples + 1, target_samples):
+        step_samples = int(step_sec * fs)
+        for start_idx in range(0, n_samples - target_samples + 1, step_samples):
             end_idx = start_idx + target_samples
             window_signal = signal_matrix[:, start_idx:end_idx]
             

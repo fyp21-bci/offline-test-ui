@@ -45,6 +45,7 @@ class GameStreamStartRequest(BaseModel):
     
     # Optional
     channels: Optional[List[int]] = None
+    decision_buffer_size: int = 5
 
 @router.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):
@@ -107,9 +108,10 @@ async def start_game_stream(request: GameStreamStartRequest):
             target_frequency=None, # Not used for game mode usually
             candidate_frequencies=request.candidate_frequencies,
             processors=request.algorithms,
-            processor_configs={}, # Default
+            processor_configs={"use_decision_buffer": True}, 
             classification_window_size=request.window_length,
-            generate_plots=False
+            generate_plots=False,
+            decision_buffer_size=request.decision_buffer_size
         )
         return {"status": "success", "message": "Game stream started"}
     except Exception as e:

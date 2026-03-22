@@ -19,9 +19,13 @@ const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ 
                                     : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
                             }`}
                         >
-                            <span>📊</span>
-                            <span>Offline Analysis</span>
-                            {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                            {({ isActive }) => (
+                                <>
+                                    <span>📊</span>
+                                    <span>Offline Analysis</span>
+                                    {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                                </>
+                            )}
                         </NavLink>
                         <NavLink 
                             to="/realtime" 
@@ -31,9 +35,13 @@ const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ 
                                     : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
                             }`}
                         >
-                            <span>⚡</span>
-                            <span>Real-Time Stream</span>
-                            {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                            {({ isActive }) => (
+                                <>
+                                    <span>⚡</span>
+                                    <span>Real-Time Stream</span>
+                                    {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                                </>
+                            )}
                         </NavLink>
                         <NavLink 
                             to="/game" 
@@ -43,9 +51,13 @@ const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ 
                                     : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
                             }`}
                         >
-                            <span>🎮</span>
-                            <span>Game Mode</span>
-                            {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                            {({ isActive }) => (
+                                <>
+                                    <span>🎮</span>
+                                    <span>Game Mode</span>
+                                    {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                                </>
+                            )}
                         </NavLink>
                     </nav>
                 </div>

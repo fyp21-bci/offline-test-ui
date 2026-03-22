@@ -2,7 +2,8 @@ import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import List, Dict, Any, Optional
+from matplotlib.ticker import MultipleLocator
+from typing import List, Dict, Any, Optional, Set
 
 from app.core.types import SignalData
 
@@ -42,7 +43,7 @@ def plot_time_domain(
         
         # Remove x-tick labels for all but bottom subplot
         if i < len(channel_indices) - 1:
-            ax.set_xticklabels([])
+            ax.tick_params(labelbottom=False)
         else:
             ax.set_xlabel('Time (s)')
     
@@ -88,12 +89,18 @@ def plot_frequency_domain(
         ax = axes[i, 0]
         ax.plot(fft_frequencies, fft_magnitude, linewidth=0.8)
         ax.set_ylabel(f"{channel_names[ch_idx]}\nMagnitude")
-        ax.set_xlim(0, 60)  # Limit frequency range to physiological EEG range (0-60Hz)
-        ax.grid(True, alpha=0.3)
+        ax.set_xlim(0.1, 30)  # Limit frequency range to (0.1-30Hz)
+        
+        # Grid settings: bold 1Hz intervals, subtle 0.1Hz intervals
+        ax.xaxis.set_major_locator(MultipleLocator(1.0))
+        ax.xaxis.set_minor_locator(MultipleLocator(0.1))
+        ax.grid(True, which='major', axis='x', color='black', linewidth=1, alpha=0.4)
+        ax.grid(True, which='minor', axis='x', color='gray', linewidth=0.5, alpha=0.2)
+        ax.grid(True, which='major', axis='y', alpha=0.3)
         
         # Remove x-tick labels for all but bottom subplot
         if i < len(channel_indices) - 1:
-            ax.set_xticklabels([])
+            ax.tick_params(labelbottom=False)
         else:
             ax.set_xlabel('Frequency (Hz)')
     
@@ -107,7 +114,7 @@ def plot_classification(
     time_end: float,
     channel_indices: List[int],
     channel_names: List[str],
-    target_frequencies: Optional[set[float]] = None,
+    target_frequencies: Optional[Set[float]] = None,
     title: Optional[str] = None
 ) -> plt.Figure:
     """
@@ -179,9 +186,6 @@ def plot_classification(
             
             # If data_array is just the window, then we need relative times.
             
-            rel_start = start_time
-            rel_end = end_time
-            
             # If start_time is huge (absolute timestamp), but data_array is small (window), we need to shift.
             # But usually signal_data provided here contains the data for the relevant range.
             
@@ -192,10 +196,13 @@ def plot_classification(
             end_sample = int((end_time) * fs)
             
             # Bounds check
-            if start_sample < 0: start_sample = 0
-            if end_sample > data_array.shape[1]: end_sample = data_array.shape[1]
+            if start_sample < 0:
+                start_sample = 0
+            if end_sample > data_array.shape[1]:
+                end_sample = data_array.shape[1]
             
-            if start_sample >= end_sample: continue # Skip invalid
+            if start_sample >= end_sample:
+                continue  # Skip invalid
             
             # Extract sub-window signal
             # This assumes data_array indices [0..N] map to Time [0..N/fs]
@@ -233,7 +240,7 @@ def plot_classification(
         
         # Remove x-tick labels for all but bottom subplot
         if i < len(channel_indices) - 1:
-            ax.set_xticklabels([])
+            ax.tick_params(labelbottom=False)
         else:
             ax.set_xlabel('Time (s)')
     

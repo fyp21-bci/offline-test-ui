@@ -12,6 +12,7 @@ class DatasetInfo(BaseModel):
     filename: str
     size_bytes: int
     available_channels: List[str]
+    created_at: float
     type: Literal["upload", "recording"] = "upload"
 
 class RunAnalysisRequest(BaseModel):

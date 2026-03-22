@@ -8,16 +8,24 @@ import HorizontalChannelControls from '../components/Visualizations/HorizontalCh
 import PlotControls from '../components/Visualizations/PlotControls';
 import HighResPlot from '../components/Visualizations/HighResPlot';
 import FFTPlot from '../components/Visualizations/FFTPlot';
+import { RotateCcw } from 'lucide-react';
 import TMSIPlot from '../components/Visualizations/TMSIPlot';
 import FBCCAPlot from '../components/Visualizations/FBCCAPlot';
 import { ApiService, type AnalysisResult } from '../api/client';
+import { ConfigPersistence, STORAGE_KEYS } from '../utils/configPersistence';
 
 function OfflineAnalysis() {
     const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
     const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [rawSignalData, setRawSignalData] = useState<any[]>([]); // To store TimeSeries data
-    const [targetFrequency, setTargetFrequency] = useState<number>(0);
+    
+    // Global Config States
+    const [candidateFrequencies, setCandidateFrequencies] = useState('7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0');
+    const [targetFrequencyInput, setTargetFrequencyInput] = useState('');
+    const [commonWindowSec, setCommonWindowSec] = useState(1.0);
+    const [refreshRate, setRefreshRate] = useState(1.0);
+    
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     // Visibility State
@@ -33,13 +41,31 @@ function OfflineAnalysis() {
     const [samplingRate, setSamplingRate] = useState(250);
 
     // Classifier Configuration State (Shared for TMSI and FBCCA)
-    const [classifierConfig, setClassifierConfig] = useState({
-        frequencies: [8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0],
-        window_sec: 1.0,
+    const [classifierParams, setClassifierParams] = useState({
         n_harmonics: 5,
-        n_subbands: 5,
-        target_frequency: null as number | number[] | null
+        n_subbands: 5
     });
+
+    // Memoized common config
+    const classifierConfig = useMemo(() => {
+        const freqs = candidateFrequencies.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+        
+        let target: number | number[] | null = null;
+        if (targetFrequencyInput.trim() !== '') {
+            if (targetFrequencyInput.includes(',')) {
+                target = targetFrequencyInput.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+            } else {
+                target = parseFloat(targetFrequencyInput);
+            }
+        }
+
+        return {
+            ...classifierParams,
+            frequencies: freqs,
+            window_sec: commonWindowSec,
+            target_frequency: target
+        };
+    }, [candidateFrequencies, targetFrequencyInput, commonWindowSec, classifierParams]);
 
     // Derived state: Get selected channel indices for plot image
     const selectedChannelIndices = availableChannels
@@ -109,6 +135,26 @@ function OfflineAnalysis() {
         }
     }, [selectedDatasetId]);
 
+    // Load last configuration on mount
+    useEffect(() => {
+        handleLoadLastConfig();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const handleLoadLastConfig = () => {
+        const lastConfig = ConfigPersistence.load<any>(STORAGE_KEYS.OFFLINE_CONFIG);
+        if (lastConfig) {
+            if (lastConfig.candidateFrequencies) setCandidateFrequencies(lastConfig.candidateFrequencies);
+            if (lastConfig.targetFrequencyInput !== undefined) setTargetFrequencyInput(lastConfig.targetFrequencyInput);
+            if (lastConfig.commonWindowSec) setCommonWindowSec(lastConfig.commonWindowSec);
+            if (lastConfig.refreshRate) setRefreshRate(lastConfig.refreshRate);
+            if (lastConfig.classifierParams) setClassifierParams(lastConfig.classifierParams);
+            console.log('📜 OfflineAnalysis: Restored last configuration from storage');
+        }
+    };
+
+    // Fetch data when dataset changes
+
 
     const handleRunAnalysis = async (chain: any[]) => {
         if (!selectedDatasetId || chain.length === 0) return;
@@ -117,6 +163,15 @@ function OfflineAnalysis() {
         setAnalysisResults(null);
 
         try {
+            // Save configuration
+            ConfigPersistence.save(STORAGE_KEYS.OFFLINE_CONFIG, {
+                candidateFrequencies,
+                targetFrequencyInput,
+                commonWindowSec,
+                refreshRate,
+                classifierParams
+            });
+
             // Execute chain.
             const lastNode = chain[chain.length - 1];
             const result = await ApiService.runAnalysis(selectedDatasetId, lastNode.processor.name, lastNode.config);
@@ -213,24 +268,68 @@ function OfflineAnalysis() {
                         )}
                     </div>
 
-                    <div className="card">
-                        <label className="text-sm font-semibold text-secondary uppercase tracking-wide mb-3 block">Expected Target (Hz)</label>
-                        <input
-                            type="number"
-                            value={targetFrequency}
-                            onChange={(e) => setTargetFrequency(Number(e.target.value))}
-                            className="w-full text-lg bg-bg-tertiary border-border-color focus:border-accent h-12 rounded-lg"
-                            placeholder="e.g., 10"
-                        />
-                        <p className="text-xs text-tertiary mt-3 font-medium">
-                            Used to color-code classification accuracy in the time series view.
-                        </p>
+                    <div className="card p-4 space-y-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-xs font-bold text-secondary uppercase tracking-wider">Common Analysis Settings</h3>
+                            <button
+                                onClick={handleLoadLastConfig}
+                                className="text-[10px] text-accent hover:text-white transition-colors flex items-center gap-1 uppercase font-bold"
+                                title="Load Last Used Settings"
+                            >
+                                <RotateCcw size={10} /> Last Used
+                            </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-tertiary uppercase">
+                            <div>
+                                <label className="block mb-1">Window Size (s)</label>
+                                <input
+                                    type="number"
+                                    value={commonWindowSec}
+                                    onChange={(e) => setCommonWindowSec(parseFloat(e.target.value) || 1.0)}
+                                    step="0.1"
+                                    className="w-full bg-bg-tertiary border border-border-color rounded px-3 py-2 text-primary text-sm focus:border-accent outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block mb-1 text-tertiary" title="Refresh Rate is not applicable for Offline Analysis">Refresh Rate (s)</label>
+                                <input
+                                    type="number"
+                                    value={refreshRate}
+                                    disabled
+                                    title="Not applicable for Offline Analysis"
+                                    className="w-full bg-bg-primary border border-border-color rounded px-3 py-2 text-tertiary text-sm outline-none cursor-not-allowed opacity-50"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold text-tertiary uppercase block mb-1">Target Frequency (Hz)</label>
+                            <input
+                                type="text"
+                                value={targetFrequencyInput}
+                                onChange={(e) => setTargetFrequencyInput(e.target.value)}
+                                placeholder="e.g. 10.0"
+                                className="w-full bg-bg-tertiary border border-border-color rounded px-3 py-2 text-primary text-sm focus:border-accent outline-none"
+                            />
+                            <p className="text-[9px] text-tertiary mt-1">Used for accuracy highlighting in plots.</p>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold text-tertiary uppercase block mb-1">Candidate Frequencies (Hz)</label>
+                            <textarea
+                                value={candidateFrequencies}
+                                onChange={(e) => setCandidateFrequencies(e.target.value)}
+                                rows={3}
+                                className="w-full bg-bg-tertiary border border-border-color rounded px-3 py-2 text-primary text-sm focus:border-accent outline-none resize-none"
+                            />
+                        </div>
                     </div>
 
                     {/* Classifier Configuration (Replaces TMSI Config) */}
                     <FBCCAConfig
-                        title="Classifier Configuration"
-                        onConfigChange={setClassifierConfig}
+                        title="Algorithm Specific Settings"
+                        onConfigChange={(c) => setClassifierParams(prev => ({ ...prev, ...c }))}
                     />
                 </div>
 
@@ -276,7 +375,7 @@ function OfflineAnalysis() {
                                             data={rawSignalData}
                                             datasetId={selectedDatasetId}
                                             results={analysisResults || []}
-                                            targetFrequency={targetFrequency}
+                                            targetFrequency={classifierConfig.target_frequency || 0}
                                             onWindowClick={(res) => {
                                                 const idx = analysisResults?.indexOf(res) ?? 0;
                                                 handleWindowClick(res, idx);

@@ -31,6 +31,8 @@ const FBCCAPlot: React.FC<FBCCAPlotProps> = ({
     const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    const abortControllerRef = useRef<AbortController | null>(null);
+
     // Fetch FBCCA classification plot when parameters change
     useEffect(() => {
         const fetchPlot = async () => {
@@ -39,6 +41,12 @@ const FBCCAPlot: React.FC<FBCCAPlotProps> = ({
                 setMetadata(null);
                 return;
             }
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const newController = new AbortController();
+            abortControllerRef.current = newController;
 
             // Calculate time window
             const startTime = timeWindow ? timeWindow.start : 0;
@@ -63,21 +71,32 @@ const FBCCAPlot: React.FC<FBCCAPlotProps> = ({
                     endTime,
                     'FBCCA Classifier',
                     fbccaConfig,
-                    targetFrequency
+                    targetFrequency,
+                    newController.signal
                 );
 
-                setPlotImageUrl(result.image);
-                setMetadata(result.metadata);
-                console.log('✅ FBCCAPlot: Successfully loaded classification plot');
+                if (result) {
+                    setPlotImageUrl(result.image);
+                    setMetadata(result.metadata);
+                    console.log('✅ FBCCAPlot: Successfully loaded classification plot');
+                }
             } catch (err: any) {
                 console.error('❌ FBCCAPlot: Failed to fetch classification plot:', err);
                 setError(err.response?.data?.detail || 'Failed to load classification plot');
             } finally {
-                setIsLoading(false);
+                if (abortControllerRef.current === newController) {
+                    setIsLoading(false);
+                }
             }
         };
 
         fetchPlot();
+
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         datasetId,

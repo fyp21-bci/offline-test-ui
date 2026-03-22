@@ -8,6 +8,8 @@ import TMSIConfig from '../components/ProcessorConfig/TMSIConfig';
 import FBCCAConfig from '../components/ProcessorConfig/FBCCAConfig';
 import { Play, Square, Check, Circle } from 'lucide-react';
 import { ApiService } from '../api/client';
+import { ConfigPersistence, STORAGE_KEYS } from '../utils/configPersistence';
+import { RotateCcw } from 'lucide-react';
 
 function RealTimeAnalysis() {
     const { isConnected, error, latestData, startStreaming, stopStreaming } = useStream(false);
@@ -23,6 +25,8 @@ function RealTimeAnalysis() {
     // Stream Settings
     const [refreshRate, setRefreshRate] = useState(1.0);
     const [classificationWindow, setClassificationWindow] = useState(1.0); // Default 1.0s
+    const [candidateFrequencies, setCandidateFrequencies] = useState('7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0');
+    const [targetFrequency, setTargetFrequency] = useState<string>('');
     const [isConfigExpanded, setIsConfigExpanded] = useState(true);
 
     // Results State
@@ -88,10 +92,17 @@ function RealTimeAnalysis() {
         if (activeProcessors['TMSI Classifier']) processor_configs['TMSI Classifier'] = tmsiConfig || DEFAULT_TMSI;
         if (activeProcessors['FBCCA Classifier']) processor_configs['FBCCA Classifier'] = fbccaConfig || DEFAULT_FBCCA;
 
+        // Parse candidate frequencies
+        const parsedCandidateFreqs = candidateFrequencies
+            .split(',')
+            .map(s => parseFloat(s.trim()))
+            .filter(n => !isNaN(n));
+
         const payload = {
             window_size_seconds: 3.0, // Buffer size
             update_interval_seconds: refreshRate,
             classification_window_size: classificationWindow,
+            candidate_frequencies: parsedCandidateFreqs,
             channels: channels,
             processors: processors,
             processor_configs: processor_configs
@@ -105,6 +116,34 @@ function RealTimeAnalysis() {
             });
         } else {
             startStreaming(payload);
+        }
+
+        // Save to last used config
+        ConfigPersistence.save(STORAGE_KEYS.REAL_TIME_CONFIG, {
+            tmsiConfig,
+            fbccaConfig,
+            activeProcessors,
+            refreshRate,
+            classificationWindow,
+            candidateFrequencies,
+            targetFrequency,
+            visibleChannels
+        });
+    };
+
+    const handleLoadLastConfig = () => {
+        const lastConfig = ConfigPersistence.load<any>(STORAGE_KEYS.REAL_TIME_CONFIG);
+        if (lastConfig) {
+            if (lastConfig.tmsiConfig) setTmsiConfig(lastConfig.tmsiConfig);
+            if (lastConfig.fbccaConfig) setFbccaConfig(lastConfig.fbccaConfig);
+            if (lastConfig.activeProcessors) setActiveProcessors(lastConfig.activeProcessors);
+            if (lastConfig.refreshRate) setRefreshRate(lastConfig.refreshRate);
+            if (lastConfig.classificationWindow) setClassificationWindow(lastConfig.classificationWindow);
+            if (lastConfig.candidateFrequencies) setCandidateFrequencies(lastConfig.candidateFrequencies);
+            if (lastConfig.targetFrequency) setTargetFrequency(lastConfig.targetFrequency);
+            if (lastConfig.visibleChannels) setVisibleChannels(lastConfig.visibleChannels);
+        } else {
+            alert("No saved configuration found.");
         }
     };
 
@@ -202,18 +241,22 @@ function RealTimeAnalysis() {
                 const rawResult = rawMap[procName];
                 const pred = rawResult ? rawResult.best_frequency : null;
 
-                // determine correctness
+                // determine correctness using global target frequency
                 let isCorrect: boolean | undefined = undefined;
-                // find target for this processor
                 let target = null;
-                if (procName === 'TMSI Classifier') target = tmsiConfig?.target_frequency;
-                if (procName === 'FBCCA Classifier') target = fbccaConfig?.target_frequency;
+                if (targetFrequency.trim() !== '') {
+                    if (targetFrequency.includes(',')) {
+                        target = targetFrequency.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+                    } else {
+                        target = parseFloat(targetFrequency);
+                    }
+                }
 
-                if (target !== null && target !== undefined && pred !== undefined) {
+                if (target !== null && target !== undefined && !isNaN(target as any) && pred !== undefined) {
                     if (Array.isArray(target)) {
                         isCorrect = target.some((t: number) => Math.abs(t - pred) < 0.1);
                     } else {
-                        isCorrect = Math.abs(target - pred) < 0.1;
+                        isCorrect = Math.abs(target - (pred as number)) < 0.1;
                     }
                 }
 
@@ -281,6 +324,21 @@ function RealTimeAnalysis() {
                                 </button>
                             )}
 
+                            {!isConnected && (
+                                <button
+                                    onClick={handleLoadLastConfig}
+                                    style={{
+                                        color: '#3498db',
+                                        backgroundColor: '#3498db20',
+                                        borderColor: '#3498db',
+                                    }}
+                                    className="px-5 py-3 flex items-center gap-2 transition-all duration-200 uppercase tracking-widest font-bold border-2 rounded-lg hover:bg-slate-800 text-sm"
+                                >
+                                    <RotateCcw size={16} />
+                                    <span>Use Last Used Setting</span>
+                                </button>
+                            )}
+
                             {/* Record Button */}
                             <button
                                 onClick={toggleRecording}
@@ -345,6 +403,29 @@ function RealTimeAnalysis() {
                                 />
                             </div>
 
+                            {/* Frequencies Configuration */}
+                            <div className="flex-1 min-w-[250px]">
+                                <label className="text-xs font-bold text-tertiary uppercase block mb-2 tracking-wide">Candidate Frequencies (Hz)</label>
+                                <input
+                                    type="text"
+                                    value={candidateFrequencies}
+                                    onChange={(e) => setCandidateFrequencies(e.target.value)}
+                                    placeholder="8.0, 9.0, 10.0..."
+                                    className="w-full bg-bg-tertiary border border-border-color rounded px-2 py-2 text-primary text-sm focus:border-accent outline-none transition-colors"
+                                />
+                            </div>
+
+                            <div className="min-w-[150px]">
+                                <label className="text-xs font-bold text-tertiary uppercase block mb-2 tracking-wide">Target Frequency</label>
+                                <input
+                                    type="text"
+                                    value={targetFrequency}
+                                    onChange={(e) => setTargetFrequency(e.target.value)}
+                                    placeholder="e.g. 10.0"
+                                    className="w-full bg-bg-tertiary border border-border-color rounded px-2 py-2 text-primary text-sm focus:border-accent outline-none transition-colors"
+                                />
+                            </div>
+
                             {/* Active Processors Toggle */}
                             <div className="min-w-[200px]">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Active Classifiers</label>
@@ -405,13 +486,13 @@ function RealTimeAnalysis() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {activeProcessors['TMSI Classifier'] && (
                                 <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-2">
-                                    <TMSIConfig onConfigChange={(c) => setTmsiConfig(c)} />
+                                    <TMSIConfig initialConfig={tmsiConfig} onConfigChange={(c) => setTmsiConfig(c)} />
                                 </div>
                             )}
 
                             {activeProcessors['FBCCA Classifier'] && (
                                 <div className="bg-slate-900 border border-slate-700/50 rounded-lg p-2">
-                                    <FBCCAConfig onConfigChange={(c) => setFbccaConfig(c)} />
+                                    <FBCCAConfig initialConfig={fbccaConfig} onConfigChange={(c) => setFbccaConfig(c)} />
                                 </div>
                             )}
                         </div>

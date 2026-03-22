@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useStream } from '../hooks/useStream';
 import { ApiService } from '../api/client';
 import BlinkingStimulus from '../components/Game/BlinkingStimulus';
-import { Play, Square, Settings, Cpu } from 'lucide-react';
+import { Play, Square, Settings, Cpu, RotateCcw } from 'lucide-react';
 import HorizontalChannelControls from '../components/Visualizations/HorizontalChannelControls';
+import { ConfigPersistence, STORAGE_KEYS } from '../utils/configPersistence';
 
 const GameMode = () => {
     const { isConnected, latestData, connect, disconnect } = useStream(false);
@@ -16,7 +17,8 @@ const GameMode = () => {
         refreshRate: 0.1,
         algorithms: ['TMSI Classifier'],
         // Default target frequencies for the balls
-        frequencies: [10.0, 12.0]
+        frequencies: [10.0, 12.0],
+        decisionBufferSize: 5
     });
 
     const [visibleChannels, setVisibleChannels] = useState<Record<string, boolean>>(() => {
@@ -38,12 +40,16 @@ const GameMode = () => {
 
         // Check TMSI result
         const tmsi = latestData.classification['TMSI Classifier'];
-        if (tmsi && tmsi.best_frequency) {
-            setPrediction({
-                algorithm: 'TMSI Classifier',
-                frequency: tmsi.best_frequency,
-                confidence: tmsi.confidence || 0
-            });
+        if (tmsi) {
+            // Prioritize buffered frequency if available
+            const frequency = tmsi.buffered_best_frequency || tmsi.best_frequency;
+            if (frequency) {
+                setPrediction({
+                    algorithm: 'TMSI Classifier',
+                    frequency: frequency,
+                    confidence: tmsi.confidence || 0
+                });
+            }
         }
     }, [latestData]);
 
@@ -58,12 +64,29 @@ const GameMode = () => {
                 refresh_rate: config.refreshRate,
                 algorithms: config.algorithms,
                 candidate_frequencies: config.frequencies,
-                channels: activeChannels
+                channels: activeChannels,
+                decision_buffer_size: config.decisionBufferSize
             });
             connect(); // Ensure websocket is connected
+
+            // Save to last used config
+            ConfigPersistence.save(STORAGE_KEYS.GAME_MODE_CONFIG, {
+                config,
+                visibleChannels
+            });
         } catch (e) {
             console.error("Failed to start game stream", e);
             alert("Failed to start game stream");
+        }
+    };
+
+    const handleLoadLastConfig = () => {
+        const lastConfig = ConfigPersistence.load<any>(STORAGE_KEYS.GAME_MODE_CONFIG);
+        if (lastConfig) {
+            if (lastConfig.config) setConfig(lastConfig.config);
+            if (lastConfig.visibleChannels) setVisibleChannels(lastConfig.visibleChannels);
+        } else {
+            alert("No saved configuration found.");
         }
     };
 
@@ -164,6 +187,14 @@ const GameMode = () => {
                                 </button>
                             )}
                         </div>
+                        {!isConnected && (
+                            <button
+                                onClick={handleLoadLastConfig}
+                                className="btn btn-outline btn-sm gap-2 text-xs border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                            >
+                                <RotateCcw size={14} /> Restore Last
+                            </button>
+                        )}
                     </div>
 
                     <div className="w-px bg-border-color self-stretch my-1" />
@@ -189,6 +220,17 @@ const GameMode = () => {
                                     value={config.refreshRate}
                                     onChange={e => setConfig({ ...config, refreshRate: parseFloat(e.target.value) })}
                                     step="0.05"
+                                    className="w-16 bg-bg-secondary border border-border-color rounded px-2 py-1 text-primary text-xs text-center transition-colors hover:border-accent focus:border-accent"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <label className="text-xs uppercase text-tertiary font-semibold whitespace-nowrap">Buffer Size</label>
+                                <input
+                                    type="number"
+                                    value={config.decisionBufferSize}
+                                    onChange={e => setConfig({ ...config, decisionBufferSize: parseInt(e.target.value) || 1 })}
+                                    min="1"
+                                    max="20"
                                     className="w-16 bg-bg-secondary border border-border-color rounded px-2 py-1 text-primary text-xs text-center transition-colors hover:border-accent focus:border-accent"
                                 />
                             </div>

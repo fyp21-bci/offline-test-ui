@@ -111,7 +111,8 @@ class StreamManager:
         processors: List[str] = ["TMSI Classifier"],
         processor_configs: Optional[Dict[str, Dict[str, Any]]] = None,
         classification_window_size: Optional[float] = None,
-        generate_plots: bool = True
+        generate_plots: bool = True,
+        decision_buffer_size: int = 5
     ):
         """Start the BrainFlow streaming and processing threads."""
         with self.lock:
@@ -158,6 +159,13 @@ class StreamManager:
                 self.processor_configs = processor_configs or {}
                 self.classification_window_size = classification_window_size
                 self.generate_plots = generate_plots
+
+                # Decision Buffering
+                self.use_decision_buffer = processor_configs.get("use_decision_buffer", False) if processor_configs else False
+                self.decision_buffer_size = decision_buffer_size
+                self.decision_buffers = {} # Dict of deques per processor
+                if self.use_decision_buffer:
+                    logger.info("Decision buffer enabled for this stream session.")
 
                 # Initialize Buffer
                 # We need to store ALL channels to keep structure consistent, 
@@ -497,28 +505,52 @@ class StreamManager:
                             try:
                                 # Get config for this processor
                                 p_config = self.processor_configs.get(p_name, {})
-                                
-                                # Default config if missing
-                                if not p_config:
+
+                                # Use configured values from processor config, or fall back to global stream settings
+                                use_freqs = p_config.get("frequencies")
+                                if use_freqs is None:
                                     use_freqs = self.candidate_frequencies if self.candidate_frequencies else [8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]
-                                    
-                                    # Use configured classification window, fallback to actual buffer duration if not set
+                                
+                                use_window = p_config.get("window_sec")
+                                if use_window is None:
                                     use_window = self.classification_window_size if self.classification_window_size else actual_duration
 
-                                    p_config = {
-                                        "frequencies": use_freqs,
-                                        "window_sec": use_window,
-                                        "n_harmonics": 5
-                                    }
+                                # Combine into effective config for this processor
+                                effective_config = {
+                                    **p_config,
+                                    "frequencies": use_freqs,
+                                    "window_sec": use_window
+                                }
                                 
-                                # Ensure window_sec matches actual data if not critical? 
-                                # Actually TMSI uses window_sec for Laplacian. 
-                                # Let's trust the config or override if needed.
+                                # Default harmonics if not set in either
+                                if "n_harmonics" not in effective_config:
+                                    effective_config["n_harmonics"] = 5
                                 
-                                res = p_instance.process(sig_data, p_config)
+                                res = p_instance.process(sig_data, effective_config)
                                 results_list = res.data.get("results", [])
                                 if results_list:
-                                    classification_results[p_name] = results_list[-1]
+                                    last_res = results_list[-1]
+                                    classification_results[p_name] = last_res
+                                    
+                                    # Handle Decision Buffer
+                                    if getattr(self, 'use_decision_buffer', False):
+                                        if p_name not in self.decision_buffers:
+                                            self.decision_buffers[p_name] = collections.deque(maxlen=self.decision_buffer_size)
+                                        
+                                        best_freq = last_res.get("best_frequency")
+                                        if best_freq is not None:
+                                            self.decision_buffers[p_name].append(best_freq)
+                                            
+                                            # Calculate Mode (Most Frequent)
+                                            recent_decisions = list(self.decision_buffers[p_name])
+                                            if recent_decisions:
+                                                from collections import Counter
+                                                counts = Counter(recent_decisions)
+                                                mode_freq = counts.most_common(1)[0][0]
+                                                
+                                                # Add stable decision to result
+                                                last_res["buffered_best_frequency"] = float(mode_freq)
+                                                logger.debug(f"Processor {p_name} stable decision: {mode_freq} from {recent_decisions}")
                             except Exception as proc_e:
                                 logger.error(f"Classification failed for {p_name}: {proc_e}")
 
@@ -576,13 +608,10 @@ class StreamManager:
                                 
                                 for p_name, result in classification_results.items():
                                     try:
-                                        # Use target frequency from this processor's config if available
+                                        # Get config for this processor
                                         p_config = self.processor_configs.get(p_name, {})
                                         
-                                        # Update with classification window if missing (same logic as above)
-                                        if 'window_sec' not in p_config and self.classification_window_size:
-                                             p_config['window_sec'] = self.classification_window_size
-
+                                        # Use target frequency from this processor's config if available
                                         p_target = p_config.get('target_frequency')
                                         p_targets = set()
                                         if p_target:

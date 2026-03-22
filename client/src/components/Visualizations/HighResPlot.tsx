@@ -45,6 +45,8 @@ const HighResPlot: React.FC<HighResPlotProps> = ({
         };
     }, [plotImageUrl]);
 
+    const abortControllerRef = useRef<AbortController | null>(null);
+
     // Fetch plot when parameters change
     useEffect(() => {
         const fetchPlot = async () => {
@@ -52,6 +54,12 @@ const HighResPlot: React.FC<HighResPlotProps> = ({
                 setPlotImageUrl(null);
                 return;
             }
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const newController = new AbortController();
+            abortControllerRef.current = newController;
 
             // Calculate time window: use provided window or full range
             const startTime = timeWindow ? timeWindow.start : 0;
@@ -73,19 +81,31 @@ const HighResPlot: React.FC<HighResPlotProps> = ({
                     selectedChannels,
                     startTime,
                     endTime,
-                    containerWidth
+                    containerWidth,
+                    'time',
+                    newController.signal
                 );
-                setPlotImageUrl(imageUrl);
-                console.log('✅ HighResPlot: Successfully loaded plot');
+                if (imageUrl) {
+                    setPlotImageUrl(imageUrl);
+                    console.log('✅ HighResPlot: Successfully loaded plot');
+                }
             } catch (err: any) {
                 console.error('❌ HighResPlot: Failed to fetch plot image:', err);
                 setError(err.response?.data?.detail || 'Failed to load plot');
             } finally {
-                setIsLoading(false);
+                if (abortControllerRef.current === newController) {
+                    setIsLoading(false);
+                }
             }
         };
 
         fetchPlot();
+
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [datasetId, selectedChannels, timeWindow, dataLength, samplingRate, containerWidth]);
 
     if (!datasetId) {

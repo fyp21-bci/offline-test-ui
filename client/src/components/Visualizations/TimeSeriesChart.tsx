@@ -6,7 +6,7 @@ interface TimeSeriesChartProps {
     data: any[]; // Raw points - ALWAYS pass full dataset, never filtered
     datasetId: string | null; // Stable ID for uirevision
     results?: AnalysisResult[]; // For coloring background
-    targetFrequency?: number;
+    targetFrequency?: number | number[];
     onWindowClick?: (result: AnalysisResult) => void;
     selectedWindowIndex?: number | null;
     visibleChannels?: Record<string, boolean>;
@@ -141,7 +141,12 @@ const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                 const end = (i + 1) * windowSize;
 
                 const detectedFreq = res.data.best_frequency;
-                const isCorrect = Math.abs((detectedFreq || 0) - targetFrequency) < 0.5;
+                let isCorrect = false;
+                if (Array.isArray(targetFrequency)) {
+                    isCorrect = targetFrequency.some(t => Math.abs((detectedFreq || 0) - t) < 0.5);
+                } else {
+                    isCorrect = Math.abs((detectedFreq || 0) - (targetFrequency || 0)) < 0.5;
+                }
                 const color = isCorrect ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)';
 
                 // Highlight box for the whole vertical column
