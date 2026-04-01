@@ -30,6 +30,8 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
     const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    const abortControllerRef = useRef<AbortController | null>(null);
+
     // Fetch TMSI classification plot when parameters change
     useEffect(() => {
         const fetchPlot = async () => {
@@ -38,6 +40,12 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
                 setMetadata(null);
                 return;
             }
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const newController = new AbortController();
+            abortControllerRef.current = newController;
 
             // Calculate time window
             const startTime = timeWindow ? timeWindow.start : 0;
@@ -62,21 +70,32 @@ const TMSIPlot: React.FC<TMSIPlotProps> = ({
                     endTime,
                     'TMSI Classifier',
                     tmsiConfig,
-                    targetFrequency
+                    targetFrequency,
+                    newController.signal
                 );
 
-                setPlotImageUrl(result.image);
-                setMetadata(result.metadata);
-                console.log('✅ TMSIPlot: Successfully loaded classification plot');
+                if (result) {
+                    setPlotImageUrl(result.image);
+                    setMetadata(result.metadata);
+                    console.log('✅ TMSIPlot: Successfully loaded classification plot');
+                }
             } catch (err: any) {
                 console.error('❌ TMSIPlot: Failed to fetch classification plot:', err);
                 setError(err.response?.data?.detail || 'Failed to load classification plot');
             } finally {
-                setIsLoading(false);
+                if (abortControllerRef.current === newController) {
+                    setIsLoading(false);
+                }
             }
         };
 
         fetchPlot();
+
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         datasetId,

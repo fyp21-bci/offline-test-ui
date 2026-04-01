@@ -1,6 +1,8 @@
 import shutil
 import uuid
 import os
+import time
+import asyncio
 from pathlib import Path
 from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException
@@ -26,6 +28,10 @@ router = APIRouter()
 # Simple storage for this MVP
 DATA_DIR = Path("data_store")
 DATA_DIR.mkdir(exist_ok=True)
+
+# State dictionaries for debouncing offline requests
+LATEST_PLOT_REQUESTS = {}
+LATEST_CLASS_REQUESTS = {}
 
 @router.get("/processors", response_model=List[ProcessorInfo])
 async def list_processors():
@@ -53,11 +59,13 @@ async def list_datasets():
     # scan uploads (root of data_store)
     for f in DATA_DIR.glob("*"):
         if f.is_file():
+            stat = f.stat()
             files.append(DatasetInfo(
                 id=f.name, 
                 filename=f.name, 
-                size_bytes=f.stat().st_size,
+                size_bytes=stat.st_size,
                 available_channels=[],
+                created_at=stat.st_mtime,
                 type="upload"
             ))
             
@@ -67,17 +75,19 @@ async def list_datasets():
         for f in recordings_dir.glob("*"):
             if f.is_file():
                 # ID includes subfolder so file read can find it
-                # OR we just use name if we assume unique?
-                # Let's use relative path as ID for safety in retrieval
                 rel_path = f.relative_to(DATA_DIR)
+                stat = f.stat()
                 files.append(DatasetInfo(
                     id=str(rel_path),
                     filename=f.name,
-                    size_bytes=f.stat().st_size,
+                    size_bytes=stat.st_size,
                     available_channels=[],
+                    created_at=stat.st_mtime,
                     type="recording"
                 ))
                 
+    # Sort files by created_at descending (newest first)
+    files.sort(key=lambda x: x.created_at, reverse=True)
     return files
     return files
 
@@ -96,6 +106,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         filename=file.filename,
         size_bytes=file_path.stat().st_size,
         available_channels=[],
+        created_at=file_path.stat().st_mtime,
         type="upload"
     )
 
@@ -217,6 +228,16 @@ async def generate_plot(request: PlotRequest):
     
     Returns a PNG image without titles.
     """
+    req_time = time.time()
+    req_key = f"{request.dataset_id}_{request.plot_type}"
+    LATEST_PLOT_REQUESTS[req_key] = req_time
+    
+    # Yield control briefly to allow newer concurrent requests to update the dictionary
+    await asyncio.sleep(0.1)
+    
+    if LATEST_PLOT_REQUESTS.get(req_key) != req_time:
+        raise HTTPException(status_code=409, detail="Request superseded by a newer request")
+
     file_path = DATA_DIR / request.dataset_id
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -312,6 +333,16 @@ async def generate_classification_plot(request: ClassificationPlotRequest):
     
     Returns a PNG image with color-coded backgrounds and JSON metadata.
     """
+    req_time = time.time()
+    req_key = f"{request.dataset_id}_{request.processor_name}"
+    LATEST_CLASS_REQUESTS[req_key] = req_time
+    
+    # Yield control briefly to allow newer concurrent requests to update the dictionary
+    await asyncio.sleep(0.1)
+    
+    if LATEST_CLASS_REQUESTS.get(req_key) != req_time:
+        raise HTTPException(status_code=409, detail="Request superseded by a newer request")
+
     file_path = DATA_DIR / request.dataset_id
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Dataset not found")

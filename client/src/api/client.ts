@@ -100,8 +100,9 @@ export const ApiService = {
         timeStart: number,
         timeEnd: number,
         width?: number,
-        plotType?: 'time' | 'fft'
-    ): Promise<string> => {
+        plotType?: 'time' | 'fft',
+        signal?: AbortSignal
+    ): Promise<string | null> => {
         console.log('🌐 API: Requesting plot from backend:', {
             datasetId,
             channels,
@@ -110,25 +111,34 @@ export const ApiService = {
             duration: timeEnd - timeStart
         });
 
-        const response = await api.post(
-            '/datasets/plot',
-            {
-                dataset_id: datasetId,
-                channels,
-                time_start: timeStart,
-                time_end: timeEnd,
-                width: width || 1200, // Default to 1200px if not provided
-                plot_type: plotType || 'time', // Default to time-domain
-            },
-            {
-                responseType: 'blob', // Important: receive binary data
-            }
-        );
+        try {
+            const response = await api.post(
+                '/datasets/plot',
+                {
+                    dataset_id: datasetId,
+                    channels,
+                    time_start: timeStart,
+                    time_end: timeEnd,
+                    width: width || 1200, // Default to 1200px if not provided
+                    plot_type: plotType || 'time', // Default to time-domain
+                },
+                {
+                    responseType: 'blob', // Important: receive binary data
+                    signal
+                }
+            );
 
-        // Convert blob to URL for displaying in img tag
-        const imageUrl = URL.createObjectURL(response.data);
-        console.log('🌐 API: Plot image received successfully');
-        return imageUrl;
+            // Convert blob to URL for displaying in img tag
+            const imageUrl = URL.createObjectURL(response.data);
+            console.log('🌐 API: Plot image received successfully');
+            return imageUrl;
+        } catch (error: any) {
+            if (axios.isCancel(error) || error.response?.status === 409) {
+                console.log('🌐 API: Plot request cancelled or stale (409)');
+                return null;
+            }
+            throw error;
+        }
     },
 
     // Classification Plot (Generic)
@@ -144,8 +154,9 @@ export const ApiService = {
             n_harmonics: number;
             [key: string]: any; // Allow other props
         },
-        targetFrequency?: number | number[]
-    ): Promise<{ image: string; metadata: any }> => {
+        targetFrequency?: number | number[],
+        signal?: AbortSignal
+    ): Promise<{ image: string; metadata: any } | null> => {
         console.log(`🌐 API: Requesting ${processorName} plot:`, {
             datasetId,
             channels,
@@ -155,18 +166,26 @@ export const ApiService = {
             targetFrequency
         });
 
-        const response = await api.post('/datasets/plot-classification', {
-            dataset_id: datasetId,
-            channels,
-            time_start: timeStart,
-            time_end: timeEnd,
-            processor_name: processorName,
-            processor_config: processorConfig,
-            target_frequency: targetFrequency
-        });
+        try {
+            const response = await api.post('/datasets/plot-classification', {
+                dataset_id: datasetId,
+                channels,
+                time_start: timeStart,
+                time_end: timeEnd,
+                processor_name: processorName,
+                processor_config: processorConfig,
+                target_frequency: targetFrequency
+            }, { signal });
 
-        console.log('🌐 API: Classification plot received successfully');
-        return response.data;
+            console.log('🌐 API: Classification plot received successfully');
+            return response.data;
+        } catch (error: any) {
+            if (axios.isCancel(error) || error.response?.status === 409) {
+                console.log(`🌐 API: ${processorName} plot request cancelled or stale (409)`);
+                return null;
+            }
+            throw error;
+        }
     },
     // Streaming
     startStream: async (config: {
@@ -194,8 +213,43 @@ export const ApiService = {
         algorithms: string[];
         candidate_frequencies: number[];
         channels?: number[];
+        decision_buffer_size?: number;
     }): Promise<{ status: string; message: string }> => {
         const response = await api.post('/stream/game/start', config);
+        return response.data;
+    },
+
+    startQuestionnaireRecording: async (config: {
+        recording_length: number;
+        window_size?: number;
+        refresh_rate?: number;
+        candidate_frequencies?: number[];
+        n_harmonics?: number;
+        channels?: number[];
+    }): Promise<{
+        status: string;
+        recording_length: number;
+        window_size: number;
+        refresh_rate: number;
+        estimated_segments: number;
+    }> => {
+        const response = await api.post('/stream/questionnaire/start', config);
+        return response.data;
+    },
+
+    getQuestionnaireResult: async (): Promise<{
+        done: boolean;
+        recording_in_progress: boolean;
+        elapsed: number;
+        recording_length: number;
+        result: {
+            majority_frequency: number;
+            segment_count: number;
+            frequency_counts: Record<string, number>;
+            all_decisions: number[];
+        } | null;
+    }> => {
+        const response = await api.get('/stream/questionnaire/result');
         return response.data;
     },
 

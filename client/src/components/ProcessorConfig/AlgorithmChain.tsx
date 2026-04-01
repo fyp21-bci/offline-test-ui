@@ -14,12 +14,28 @@ interface AlgorithmNode {
 interface AlgorithmChainProps {
     onRun: (chain: AlgorithmNode[]) => void;
     isProcessing: boolean;
+    initialChain?: AlgorithmNode[];
+    onChainChange?: (chain: AlgorithmNode[]) => void;
 }
 
-const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) => {
+const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing, initialChain, onChainChange }) => {
     const [availableProcessors, setAvailableProcessors] = useState<Processor[]>([]);
-    const [chain, setChain] = useState<AlgorithmNode[]>([]);
+    const [chain, setChain] = useState<AlgorithmNode[]>(initialChain || []);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+    // Sync external chain changes
+    useEffect(() => {
+        if (initialChain) {
+            setChain(initialChain);
+        }
+    }, [initialChain]);
+
+    // Notify parent of chain changes
+    useEffect(() => {
+        if (onChainChange) {
+            onChainChange(chain);
+        }
+    }, [chain, onChainChange]);
 
     // Fetch available processors on mount
     useEffect(() => {
@@ -61,46 +77,49 @@ const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) 
             {/* Left Column: Chain Builder */}
             <div className="md:col-span-1 space-y-4">
                 <div className="card h-full flex flex-col">
-                    <h3 className="text-2xl font-bold mb-8 flex items-center gap-4 text-white">
+                    <h3 className="text-2xl font-bold mb-6 flex items-center gap-3 text-primary tracking-tight">
                         Algorithm Chain
                     </h3>
 
-                    <div className="flex-1 space-y-2 overflow-y-auto mb-4">
+                    <div className="flex-1 space-y-2 overflow-y-auto mb-6">
                         {chain.length === 0 && (
-                            <p className="text-sm text-gray-500 text-center py-8 border border-dashed border-gray-700 rounded">
-                                No algorithms added. Add one to start.
+                            <p className="text-sm text-muted text-center py-8 border border-dashed border-border-color rounded-lg">
+                                No algorithms added yet
                             </p>
                         )}
                         {chain.map((node, index) => (
                             <div
                                 key={node.id}
                                 onClick={() => setSelectedNodeId(node.id)}
-                                className={`p-5 rounded-xl border-2 cursor-pointer flex items-center justify-between group transition-all duration-200 mb-3 ${selectedNodeId === node.id
-                                    ? 'border-accent bg-slate-700 shadow-lg'
-                                    : 'border-transparent bg-slate-800 hover:bg-slate-700'
-                                    }`}
+                                className={`p-4 rounded-lg border cursor-pointer flex items-center justify-between group transition-all duration-200 ${
+                                    selectedNodeId === node.id
+                                        ? 'border-accent bg-accent/10 shadow-lg'
+                                        : 'border-border-color bg-bg-tertiary hover:border-accent hover:bg-bg-active'
+                                }`}
                             >
-                                <div className="flex items-center gap-4">
-                                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-600 text-sm font-mono text-slate-300">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-accent text-black text-xs font-bold flex-shrink-0">
                                         {index + 1}
                                     </span>
-                                    <span className="font-bold text-xl text-white">{node.processor.name}</span>
+                                    <span className={`font-semibold truncate ${selectedNodeId === node.id ? 'text-primary' : 'text-secondary'}`}>
+                                        {node.processor.name}
+                                    </span>
                                 </div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); removeProcessor(node.id); }}
-                                    className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-error hover:bg-error/10 rounded-lg transition-all flex-shrink-0 ml-2"
                                     title="Remove"
                                 >
-                                    <Trash2 size={24} />
+                                    <Trash2 size={18} />
                                 </button>
                             </div>
                         ))}
                     </div>
 
-                    <div className="pt-6 border-t border-slate-700">
-                        <label className="block text-sm font-bold text-slate-400 mb-3">ADD ALGORITHM</label>
+                    <div className="pt-6 border-t border-border-color">
+                        <label className="block text-xs font-bold text-tertiary mb-3 uppercase tracking-wide">Add Algorithm</label>
                         <select
-                            className="w-full mb-2 h-16 text-lg bg-slate-800 border-slate-700 hover:border-slate-500 transition-colors rounded-xl px-4"
+                            className="w-full h-12 text-base bg-bg-tertiary border-border-color hover:border-accent transition-colors rounded-lg px-3"
                             onChange={(e) => {
                                 if (e.target.value) {
                                     addProcessor(e.target.value);
@@ -120,16 +139,16 @@ const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) 
             {/* Right Column: Configuration */}
             <div className="md:col-span-2">
                 <div className="card h-full">
-                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-700">
-                        <h3 className="text-2xl font-bold flex items-center gap-4 text-white">
-                            <Settings size={32} />
+                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-border-color">
+                        <h3 className="text-2xl font-bold flex items-center gap-3 text-primary tracking-tight">
+                            <Settings size={28} className="text-accent" />
                             Configuration
                         </h3>
                         {chain.length > 0 && (
                             <button
                                 onClick={() => onRun(chain)}
                                 disabled={isProcessing}
-                                className={`btn btn-primary px-8 py-4 text-xl ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`btn btn-primary ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 {isProcessing ? 'PROCESSING...' : 'RUN ANALYSIS'}
                             </button>
@@ -139,8 +158,8 @@ const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) 
                     {selectedNode ? (
                         <div className="prose prose-invert max-w-none">
                             <div className="mb-8">
-                                <h4 className="text-2xl font-bold text-accent mb-2">{selectedNode.processor.name}</h4>
-                                <p className="text-lg text-slate-400">{selectedNode.processor.description}</p>
+                                <h4 className="text-2xl font-bold text-accent mb-2 tracking-tight">{selectedNode.processor.name}</h4>
+                                <p className="text-base text-secondary">{selectedNode.processor.description}</p>
                             </div>
 
                             <div className="form-container">
@@ -156,9 +175,9 @@ const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) 
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                        <div className="h-full flex flex-col items-center justify-center text-muted">
                             <Settings size={48} className="mb-4 opacity-20" />
-                            <p>Select an algorithm block to configure parameters.</p>
+                            <p className="text-base">Select an algorithm to configure parameters.</p>
                         </div>
                     )}
                 </div>

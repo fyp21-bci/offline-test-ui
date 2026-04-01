@@ -42,6 +42,7 @@ class TMSIProcessor(Processor):
         frequencies = config.get("frequencies", [10.0, 12.0])
         window_sec = config.get("window_sec", 1.0)
         n_harmonics = config.get("n_harmonics", 5)
+        step_sec = config.get("step_sec", window_sec)
         
         # Prepare Signal
         # TMSI core usually works on 1D or Multi-channel. 
@@ -63,7 +64,8 @@ class TMSIProcessor(Processor):
         results = []
         
         # Iterate windows
-        for start_idx in range(0, n_samples - target_samples + 1, target_samples):
+        step_samples = int(step_sec * fs)
+        for start_idx in range(0, n_samples - target_samples + 1, step_samples):
             end_idx = start_idx + target_samples
             window_signal = signal_matrix[:, start_idx:end_idx]
             

@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useStream } from '../hooks/useStream';
 import { ApiService } from '../api/client';
 import BlinkingStimulus from '../components/Game/BlinkingStimulus';
-import { Play, Square, Settings, Cpu } from 'lucide-react';
+import { Play, Square, Settings, Cpu, RotateCcw } from 'lucide-react';
 import HorizontalChannelControls from '../components/Visualizations/HorizontalChannelControls';
+import { ConfigPersistence, STORAGE_KEYS } from '../utils/configPersistence';
 
 const GameMode = () => {
     const { isConnected, latestData, connect, disconnect } = useStream(false);
@@ -16,7 +17,8 @@ const GameMode = () => {
         refreshRate: 0.1,
         algorithms: ['TMSI Classifier'],
         // Default target frequencies for the balls
-        frequencies: [10.0, 12.0]
+        frequencies: [10.0, 12.0],
+        decisionBufferSize: 5
     });
 
     const [visibleChannels, setVisibleChannels] = useState<Record<string, boolean>>(() => {
@@ -38,12 +40,16 @@ const GameMode = () => {
 
         // Check TMSI result
         const tmsi = latestData.classification['TMSI Classifier'];
-        if (tmsi && tmsi.best_frequency) {
-            setPrediction({
-                algorithm: 'TMSI Classifier',
-                frequency: tmsi.best_frequency,
-                confidence: tmsi.confidence || 0
-            });
+        if (tmsi) {
+            // Prioritize buffered frequency if available
+            const frequency = tmsi.buffered_best_frequency || tmsi.best_frequency;
+            if (frequency) {
+                setPrediction({
+                    algorithm: 'TMSI Classifier',
+                    frequency: frequency,
+                    confidence: tmsi.confidence || 0
+                });
+            }
         }
     }, [latestData]);
 
@@ -58,12 +64,29 @@ const GameMode = () => {
                 refresh_rate: config.refreshRate,
                 algorithms: config.algorithms,
                 candidate_frequencies: config.frequencies,
-                channels: activeChannels
+                channels: activeChannels,
+                decision_buffer_size: config.decisionBufferSize
             });
             connect(); // Ensure websocket is connected
+
+            // Save to last used config
+            ConfigPersistence.save(STORAGE_KEYS.GAME_MODE_CONFIG, {
+                config,
+                visibleChannels
+            });
         } catch (e) {
             console.error("Failed to start game stream", e);
             alert("Failed to start game stream");
+        }
+    };
+
+    const handleLoadLastConfig = () => {
+        const lastConfig = ConfigPersistence.load<any>(STORAGE_KEYS.GAME_MODE_CONFIG);
+        if (lastConfig) {
+            if (lastConfig.config) setConfig(lastConfig.config);
+            if (lastConfig.visibleChannels) setVisibleChannels(lastConfig.visibleChannels);
+        } else {
+            alert("No saved configuration found.");
         }
     };
 
@@ -91,8 +114,8 @@ const GameMode = () => {
                 <div className="flex-1 bg-black relative flex flex-col overflow-hidden">
 
                     {/* Status Overlay */}
-                    <div className="absolute top-4 right-4 bg-slate-900/80 p-3 rounded border border-slate-700 backdrop-blur-sm z-10 w-auto">
-                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Prediction</div>
+                    <div className="absolute top-4 right-4 bg-bg-tertiary/90 p-4 rounded-lg border border-border-color backdrop-blur-sm z-10 w-auto">
+                        <div className="text-xs text-tertiary uppercase font-semibold mb-2 tracking-wide">Prediction</div>
                         {prediction ? (
                             <div>
                                 <div className="text-2xl font-bold text-white mb-1">
@@ -137,12 +160,12 @@ const GameMode = () => {
                 </div>
 
                 {/* Configuration Panel (Bottom) */}
-                <div className="w-full h-auto bg-slate-900 border-t border-slate-800 p-4 flex flex-row gap-8 overflow-x-auto shrink-0 items-start">
+                <div className="w-full h-auto bg-bg-tertiary border-t border-border-color p-4 flex flex-row gap-8 overflow-x-auto shrink-0 items-start">
 
                     {/* Control Group */}
                     <div className="flex flex-col gap-3 min-w-[160px]">
-                        <h2 className="text-base font-bold text-white flex items-center gap-2">
-                            <Settings size={18} />
+                        <h2 className="text-base font-bold text-primary flex items-center gap-2 uppercase tracking-wide">
+                            <Settings size={18} className="text-accent" />
                             Game Config
                         </h2>
 
@@ -151,45 +174,64 @@ const GameMode = () => {
                             {!isConnected ? (
                                 <button
                                     onClick={handleStart}
-                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded flex items-center justify-center gap-2 font-bold text-sm transition-colors"
+                                    className="flex-1 btn btn-success btn-sm gap-2"
                                 >
                                     <Play size={16} /> Start
                                 </button>
                             ) : (
                                 <button
                                     onClick={handleStop}
-                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded flex items-center justify-center gap-2 font-bold text-sm transition-colors"
+                                    className="flex-1 btn btn-danger btn-sm gap-2"
                                 >
                                     <Square size={16} /> Stop
                                 </button>
                             )}
                         </div>
+                        {!isConnected && (
+                            <button
+                                onClick={handleLoadLastConfig}
+                                className="btn btn-outline btn-sm gap-2 text-xs border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                            >
+                                <RotateCcw size={14} /> Restore Last
+                            </button>
+                        )}
                     </div>
 
-                    <div className="w-px bg-slate-700 self-stretch my-1" />
+                    <div className="w-px bg-border-color self-stretch my-1" />
 
                     {/* Stream Params */}
                     <div className="flex flex-col gap-3 min-w-[140px]">
-                        <h3 className="text-[10px] font-bold text-white uppercase opacity-70">Parameters</h3>
+                        <h3 className="text-xs font-bold text-secondary uppercase tracking-wide">Parameters</h3>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-[10px] uppercase text-slate-400 font-bold whitespace-nowrap">Window (s)</label>
+                                <label className="text-xs uppercase text-tertiary font-semibold whitespace-nowrap">Window (s)</label>
                                 <input
                                     type="number"
                                     value={config.windowLength}
                                     onChange={e => setConfig({ ...config, windowLength: parseFloat(e.target.value) })}
                                     step="0.1"
-                                    className="w-16 bg-slate-900 border border-slate-700 rounded p-1 text-white text-xs text-center"
+                                    className="w-16 bg-bg-secondary border border-border-color rounded px-2 py-1 text-primary text-xs text-center transition-colors hover:border-accent focus:border-accent"
                                 />
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                                <label className="text-[10px] uppercase text-slate-400 font-bold whitespace-nowrap">Refresh (s)</label>
+                                <label className="text-xs uppercase text-tertiary font-semibold whitespace-nowrap">Refresh (s)</label>
                                 <input
                                     type="number"
                                     value={config.refreshRate}
                                     onChange={e => setConfig({ ...config, refreshRate: parseFloat(e.target.value) })}
                                     step="0.05"
-                                    className="w-16 bg-slate-900 border border-slate-700 rounded p-1 text-white text-xs text-center"
+                                    className="w-16 bg-bg-secondary border border-border-color rounded px-2 py-1 text-primary text-xs text-center transition-colors hover:border-accent focus:border-accent"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <label className="text-xs uppercase text-tertiary font-semibold whitespace-nowrap">Buffer Size</label>
+                                <input
+                                    type="number"
+                                    value={config.decisionBufferSize}
+                                    onChange={e => setConfig({ ...config, decisionBufferSize: parseInt(e.target.value) || 1 })}
+                                    min="1"
+                                    max="20"
+                                    className="w-16 bg-bg-secondary border border-border-color rounded px-2 py-1 text-primary text-xs text-center transition-colors hover:border-accent focus:border-accent"
                                 />
                             </div>
                         </div>
@@ -199,32 +241,32 @@ const GameMode = () => {
 
                     {/* Frequencies */}
                     <div className="flex flex-col gap-3 min-w-[180px]">
-                        <h3 className="text-[10px] font-bold text-white uppercase opacity-70">Frequencies</h3>
+                        <h3 className="text-xs font-bold text-secondary uppercase tracking-wide">Frequencies</h3>
                         <div className="flex flex-wrap gap-x-4 gap-y-2">
                             {config.frequencies.map((freq, idx) => (
                                 <div key={idx} className="flex gap-2 items-center">
-                                    <div className="w-2 h-2 rounded-full bg-white border border-slate-600"></div>
+                                    <div className="w-2 h-2 rounded-full bg-accent border-2 border-accent"></div>
                                     <input
                                         type="number"
                                         value={freq}
                                         onChange={e => handleFreqChange(idx, e.target.value)}
-                                        className="w-16 bg-slate-900 border border-slate-700 rounded p-1 text-white text-xs"
+                                        className="w-16 bg-bg-secondary border border-border-color rounded px-2 py-1 text-primary text-xs transition-colors hover:border-accent focus:border-accent"
                                     />
-                                    <span className="text-slate-400 text-[10px]">Hz</span>
+                                    <span className="text-tertiary text-xs">Hz</span>
                                 </div>
                             ))}
                         </div>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setConfig(prev => ({ ...prev, frequencies: [...prev.frequencies, 10.0] }))}
-                                className="text-[10px] text-sky-400 hover:text-sky-300"
+                                className="text-xs text-accent hover:text-accent-light font-semibold"
                             >
                                 + Add
                             </button>
                             {config.frequencies.length > 2 && (
                                 <button
                                     onClick={() => setConfig(prev => ({ ...prev, frequencies: prev.frequencies.slice(0, -1) }))}
-                                    className="text-[10px] text-red-400 hover:text-red-300"
+                                    className="text-xs text-error hover:text-error font-semibold"
                                 >
                                     - Remove
                                 </button>
