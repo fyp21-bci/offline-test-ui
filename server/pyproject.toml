@@ -18,4 +18,5 @@ dependencies = [
     "setuptools<81",
     "websockets>=13.0",
     "scikit-learn>=1.6.1",
+    "pygame>=2.6.1",
 ]

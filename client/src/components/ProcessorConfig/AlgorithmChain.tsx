@@ -14,12 +14,28 @@ interface AlgorithmNode {
 interface AlgorithmChainProps {
     onRun: (chain: AlgorithmNode[]) => void;
     isProcessing: boolean;
+    initialChain?: AlgorithmNode[];
+    onChainChange?: (chain: AlgorithmNode[]) => void;
 }
 
-const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing }) => {
+const AlgorithmChain: React.FC<AlgorithmChainProps> = ({ onRun, isProcessing, initialChain, onChainChange }) => {
     const [availableProcessors, setAvailableProcessors] = useState<Processor[]>([]);
-    const [chain, setChain] = useState<AlgorithmNode[]>([]);
+    const [chain, setChain] = useState<AlgorithmNode[]>(initialChain || []);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+    // Sync external chain changes
+    useEffect(() => {
+        if (initialChain) {
+            setChain(initialChain);
+        }
+    }, [initialChain]);
+
+    // Notify parent of chain changes
+    useEffect(() => {
+        if (onChainChange) {
+            onChainChange(chain);
+        }
+    }, [chain, onChainChange]);
 
     // Fetch available processors on mount
     useEffect(() => {

@@ -219,6 +219,40 @@ export const ApiService = {
         return response.data;
     },
 
+    startQuestionnaireRecording: async (config: {
+        recording_length: number;
+        window_size?: number;
+        refresh_rate?: number;
+        candidate_frequencies?: number[];
+        n_harmonics?: number;
+        channels?: number[];
+    }): Promise<{
+        status: string;
+        recording_length: number;
+        window_size: number;
+        refresh_rate: number;
+        estimated_segments: number;
+    }> => {
+        const response = await api.post('/stream/questionnaire/start', config);
+        return response.data;
+    },
+
+    getQuestionnaireResult: async (): Promise<{
+        done: boolean;
+        recording_in_progress: boolean;
+        elapsed: number;
+        recording_length: number;
+        result: {
+            majority_frequency: number;
+            segment_count: number;
+            frequency_counts: Record<string, number>;
+            all_decisions: number[];
+        } | null;
+    }> => {
+        const response = await api.get('/stream/questionnaire/result');
+        return response.data;
+    },
+
     // Recording
     startRecording: async (filename?: string): Promise<{ status: string; message: string; filename?: string }> => {
         const response = await api.post('/stream/record/start', { filename });

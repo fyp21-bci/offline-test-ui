@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
     REAL_TIME_CONFIG: 'bci_real_time_config',
     GAME_MODE_CONFIG: 'bci_game_mode_config',
     OFFLINE_CONFIG: 'bci_offline_config',
+    QUESTIONNAIRE_MODE_CONFIG: 'bci_questionnaire_mode_config',
 };
 
 export const ConfigPersistence = {

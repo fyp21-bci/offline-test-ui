@@ -69,6 +69,16 @@ class StreamManager:
         self.recording_start_time = 0
         self.recording_filename = ""
 
+        # Questionnaire mode
+        self.questionnaire_mode = False
+        self.questionnaire_config: Dict[str, Any] = {}
+        self.questionnaire_recording_buffer: List = []
+        self.questionnaire_start_time: float = 0.0
+        self.questionnaire_recording_length: float = 0.0
+        self.questionnaire_done: bool = False
+        self.questionnaire_result: Optional[Dict[str, Any]] = None
+        self._questionnaire_timer: Optional[threading.Timer] = None
+
     async def connect_client(self, websocket):
         """Register a new websocket client."""
         await websocket.accept()
@@ -393,6 +403,11 @@ class StreamManager:
                          # Append copy to list. 
                          # We append raw chunks. We'll merge them later.
                          self.recording_buffer.append(data.copy())
+
+                    # Questionnaire mode: capture data into separate buffer
+                    if self.questionnaire_mode:
+                        with self.buffer_lock:
+                            self.questionnaire_recording_buffer.append(data.copy())
                             
                 time.sleep(0.01) # Poll frequently to keep internal buffer empty
             except Exception as e:
@@ -675,4 +690,190 @@ class StreamManager:
             "port": self.params.serial_port,
             "window_size": self.window_size_seconds,
             "clients": len(self.active_websockets)
+        }
+
+    # ------------------------------------------------------------------
+    # Questionnaire Mode
+    # ------------------------------------------------------------------
+
+    def start_questionnaire_recording(self, config: Dict[str, Any]):
+        """Begin a fixed-length questionnaire recording.
+
+        Args:
+            config: Must contain:
+                - recording_length (float): seconds to record
+                - window_size (float): classification window width in seconds
+                - refresh_rate (float): step between windows in seconds
+                - candidate_frequencies (List[float])
+                - algorithms (List[str]): processor names (default ["TMSI Classifier"])
+                - channels (Optional[List[int]]): EEG channel indices
+                - n_harmonics (int): default 5
+        """
+        if not self.is_streaming:
+            raise RuntimeError("BrainFlow stream must be running before starting questionnaire recording")
+
+        if self.questionnaire_mode:
+            raise RuntimeError("A questionnaire recording is already in progress")
+
+        recording_length = float(config["recording_length"])
+
+        # Reset state
+        self.questionnaire_config = config
+        self.questionnaire_recording_buffer = []
+        self.questionnaire_start_time = time.time()
+        self.questionnaire_recording_length = recording_length
+        self.questionnaire_done = False
+        self.questionnaire_result = None
+        self.questionnaire_mode = True
+
+        logger.info(f"Questionnaire recording started – length: {recording_length}s")
+
+        # Schedule automatic finish
+        self._questionnaire_timer = threading.Timer(
+            recording_length, self._finish_questionnaire
+        )
+        self._questionnaire_timer.daemon = True
+        self._questionnaire_timer.start()
+
+    def _finish_questionnaire(self):
+        """Called automatically once recording_length elapses. Classifies all windows and votes."""
+        logger.info("Questionnaire recording finished – running classification...")
+
+        with self.buffer_lock:
+            raw_chunks = list(self.questionnaire_recording_buffer)
+
+        self.questionnaire_mode = False
+
+        if not raw_chunks:
+            logger.warning("Questionnaire buffer is empty – no data recorded")
+            self.questionnaire_result = {
+                "majority_frequency": None,
+                "segment_count": 0,
+                "frequency_counts": {},
+                "all_decisions": []
+            }
+            self.questionnaire_done = True
+            return
+
+        try:
+            # Merge all raw chunks into one matrix (n_channels, n_samples)
+            data = np.hstack(raw_chunks)
+
+            # Extract EEG channels
+            eeg_channels = getattr(self, 'eeg_channels', list(range(8)))
+            all_eeg = data[eeg_channels, :]
+
+            selected_channels = self.questionnaire_config.get("channels")
+            if selected_channels and len(selected_channels) > 0:
+                valid = [i for i in selected_channels if i < all_eeg.shape[0]]
+                eeg_data = all_eeg[valid, :] if valid else all_eeg
+            else:
+                eeg_data = all_eeg
+
+            n_channels, n_samples = eeg_data.shape
+            fs = int(self.sampling_rate)
+
+            # Preprocessing
+            channel_names = [f"Ch{i+1}" for i in range(n_channels)]
+            raw_sig = SignalData(
+                data=eeg_data.tolist(),
+                fs=fs,
+                channel_names=channel_names
+            )
+            try:
+                preprocessed = PreprocessingProcessor.apply_default_preprocessing(raw_sig)
+                eeg_data = np.array(preprocessed.data)
+            except Exception as pre_e:
+                logger.error(f"Questionnaire preprocessing failed: {pre_e}")
+
+            # Classification config
+            window_sec = float(self.questionnaire_config.get("window_size", 2.0))
+            refresh_rate = float(self.questionnaire_config.get("refresh_rate", 0.5))
+            candidate_frequencies = self.questionnaire_config.get("candidate_frequencies", [8.0, 10.0, 12.0, 14.0])
+            n_harmonics = int(self.questionnaire_config.get("n_harmonics", 5))
+            algorithms = self.questionnaire_config.get("algorithms", ["TMSI Classifier"])
+
+            window_samples = int(window_sec * fs)
+            step_samples = int(refresh_rate * fs)
+
+            if window_samples > n_samples:
+                logger.warning("Recording shorter than window_size – using entire recording as one window")
+                window_samples = n_samples
+                step_samples = n_samples
+
+            sig_data = SignalData(
+                data=eeg_data.tolist(),
+                fs=fs,
+                channel_names=channel_names
+            )
+
+            all_decisions = []
+            from collections import Counter
+
+            for algo_name in algorithms:
+                processor_cls = Registry.get_processor(algo_name)
+                if processor_cls is None:
+                    logger.error(f"Questionnaire: processor '{algo_name}' not found")
+                    continue
+
+                processor = processor_cls()
+                proc_config = {
+                    "frequencies": candidate_frequencies,
+                    "window_sec": window_sec,
+                    "step_sec": refresh_rate,
+                    "n_harmonics": n_harmonics
+                }
+
+                try:
+                    result = processor.process(sig_data, proc_config)
+                    segments = result.data.get("results", [])
+                    for seg in segments:
+                        all_decisions.append(seg.get("best_frequency"))
+                except Exception as ce:
+                    logger.error(f"Questionnaire classification failed for {algo_name}: {ce}")
+
+            # Majority vote
+            frequency_counts = {}
+            majority_frequency = None
+            if all_decisions:
+                valid_decisions = [d for d in all_decisions if d is not None]
+                if valid_decisions:
+                    counts = Counter(valid_decisions)
+                    majority_frequency = float(counts.most_common(1)[0][0])
+                    frequency_counts = {str(k): v for k, v in counts.items()}
+
+            self.questionnaire_result = {
+                "majority_frequency": majority_frequency,
+                "segment_count": len(all_decisions),
+                "frequency_counts": frequency_counts,
+                "all_decisions": [float(d) if d is not None else None for d in all_decisions]
+            }
+            logger.info(f"Questionnaire result: majority={majority_frequency}, segments={len(all_decisions)}, counts={frequency_counts}")
+
+        except Exception as e:
+            logger.error(f"Questionnaire _finish_questionnaire error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.questionnaire_result = {
+                "majority_frequency": None,
+                "segment_count": 0,
+                "frequency_counts": {},
+                "all_decisions": [],
+                "error": str(e)
+            }
+        finally:
+            self.questionnaire_done = True
+            # Stop the BrainFlow stream now that the questionnaire session is over
+            logger.info("Questionnaire finished – stopping BrainFlow stream.")
+            self.stop_stream()
+
+    def get_questionnaire_result(self) -> Dict[str, Any]:
+        """Return current questionnaire state. Poll this endpoint."""
+        elapsed = time.time() - self.questionnaire_start_time if self.questionnaire_start_time else 0.0
+        return {
+            "done": self.questionnaire_done,
+            "recording_in_progress": self.questionnaire_mode,
+            "elapsed": round(elapsed, 2),
+            "recording_length": self.questionnaire_recording_length,
+            "result": self.questionnaire_result
         }

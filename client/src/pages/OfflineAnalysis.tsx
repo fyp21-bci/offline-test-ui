@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from '../components/Layout';
 import DatasetSelector from '../components/DatasetSelector';
 import AlgorithmChain from '../components/ProcessorConfig/AlgorithmChain';
@@ -19,6 +19,7 @@ function OfflineAnalysis() {
     const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [rawSignalData, setRawSignalData] = useState<any[]>([]); // To store TimeSeries data
+    const isInitialLoad = useRef(true);
     
     // Global Config States
     const [candidateFrequencies, setCandidateFrequencies] = useState('7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0');
@@ -45,6 +46,8 @@ function OfflineAnalysis() {
         n_harmonics: 5,
         n_subbands: 5
     });
+    
+    const [algorithmChain, setAlgorithmChain] = useState<any[]>([]);
 
     // Memoized common config
     const classifierConfig = useMemo(() => {
@@ -110,11 +113,17 @@ function OfflineAnalysis() {
                         : res.data.map((_, i) => `Ch${i + 1}`);
 
                     setAvailableChannels(channels);
+                    console.log('📊 OfflineAnalysis: Dataset loaded, channels:', channels);
 
-                    // Initial visibility: All true
-                    const initialVis: Record<string, boolean> = {};
-                    channels.forEach(ch => initialVis[ch] = true);
-                    setVisibleChannels(initialVis);
+                    // Initial visibility: All true (unless it's the initial load from persistence)
+                    if (isInitialLoad.current) {
+                        console.log('📜 OfflineAnalysis: Preserving visible channels from persistence');
+                        isInitialLoad.current = false;
+                    } else {
+                        const initialVis: Record<string, boolean> = {};
+                        channels.forEach(ch => initialVis[ch] = true);
+                        setVisibleChannels(initialVis);
+                    }
 
                     // Assuming res.data is number[][] (channels x samples)
                     for (let i = 0; i < n_samples; i++) {
@@ -144,14 +153,38 @@ function OfflineAnalysis() {
     const handleLoadLastConfig = () => {
         const lastConfig = ConfigPersistence.load<any>(STORAGE_KEYS.OFFLINE_CONFIG);
         if (lastConfig) {
+            if (lastConfig.selectedDatasetId) setSelectedDatasetId(lastConfig.selectedDatasetId);
             if (lastConfig.candidateFrequencies) setCandidateFrequencies(lastConfig.candidateFrequencies);
             if (lastConfig.targetFrequencyInput !== undefined) setTargetFrequencyInput(lastConfig.targetFrequencyInput);
             if (lastConfig.commonWindowSec) setCommonWindowSec(lastConfig.commonWindowSec);
             if (lastConfig.refreshRate) setRefreshRate(lastConfig.refreshRate);
             if (lastConfig.classifierParams) setClassifierParams(lastConfig.classifierParams);
+            if (lastConfig.algorithmChain) setAlgorithmChain(lastConfig.algorithmChain);
+            if (lastConfig.visibleChannels) setVisibleChannels(lastConfig.visibleChannels);
             console.log('📜 OfflineAnalysis: Restored last configuration from storage');
         }
     };
+
+    // Auto-save configuration on changes
+    useEffect(() => {
+        if (isInitialLoad.current) return;
+
+        const timer = setTimeout(() => {
+            ConfigPersistence.save(STORAGE_KEYS.OFFLINE_CONFIG, {
+                selectedDatasetId,
+                candidateFrequencies,
+                targetFrequencyInput,
+                commonWindowSec,
+                refreshRate,
+                classifierParams,
+                algorithmChain,
+                visibleChannels
+            });
+            console.log('💾 OfflineAnalysis: Auto-saved configuration');
+        }, 1000); // Debounce save
+
+        return () => clearTimeout(timer);
+    }, [selectedDatasetId, candidateFrequencies, targetFrequencyInput, commonWindowSec, refreshRate, classifierParams, algorithmChain, visibleChannels]);
 
     // Fetch data when dataset changes
 
@@ -169,7 +202,9 @@ function OfflineAnalysis() {
                 targetFrequencyInput,
                 commonWindowSec,
                 refreshRate,
-                classifierParams
+                classifierParams,
+                algorithmChain: chain,
+                visibleChannels
             });
 
             // Execute chain.
@@ -329,6 +364,7 @@ function OfflineAnalysis() {
                     {/* Classifier Configuration (Replaces TMSI Config) */}
                     <FBCCAConfig
                         title="Algorithm Specific Settings"
+                        initialConfig={classifierParams}
                         onConfigChange={(c) => setClassifierParams(prev => ({ ...prev, ...c }))}
                     />
                 </div>
@@ -338,7 +374,12 @@ function OfflineAnalysis() {
 
                     {/* Top: Algorithm Builder */}
                     <div className="h-[350px] min-h-[350px]">
-                        <AlgorithmChain onRun={handleRunAnalysis} isProcessing={isProcessing} />
+                        <AlgorithmChain 
+                            onRun={handleRunAnalysis} 
+                            isProcessing={isProcessing} 
+                            initialChain={algorithmChain}
+                            onChainChange={setAlgorithmChain}
+                        />
                     </div>
 
                     {/* Bottom: Visualization Dashboard */}
