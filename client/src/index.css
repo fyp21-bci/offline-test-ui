@@ -85,7 +85,7 @@ body {
 .layout-header {
   height: var(--header-height);
   border-bottom: 1px solid var(--border-color);
-  background: linear-gradient(180deg, rgba(5, 5, 5, 0.95) 0%, rgba(10, 10, 10, 0.85) 100%);
+  background-color: rgba(5, 5, 5, 0.95);
   backdrop-filter: blur(16px);
   position: sticky;
   top: 0;
@@ -174,10 +174,7 @@ body {
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.025em;
-  background: linear-gradient(to right, #fff, #00f0ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--accent-color);
   text-transform: uppercase;
 }
 
@@ -206,7 +203,7 @@ body {
 }
 
 .card-elevated {
-  background: linear-gradient(135deg, rgba(10, 10, 10, 0.8) 0%, rgba(17, 17, 17, 0.4) 100%);
+  background-color: rgba(10, 10, 10, 0.8);
   backdrop-filter: blur(10px);
   border-color: var(--border-light);
 }

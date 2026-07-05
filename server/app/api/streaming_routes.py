@@ -121,7 +121,7 @@ async def start_game_stream(request: GameStreamStartRequest):
 class QuestionnaireStartRequest(BaseModel):
     # Connection params
     serial_port: str = "/dev/ttyUSB0"
-    board_id: Optional[int] = None
+    board_id: int = 0
 
     # Recording config
     recording_length: float  # Total seconds to record

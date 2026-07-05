@@ -1,0 +1,242 @@
+[gd_scene load_steps=7 format=3 uid="uid://dbjrofwl7ytfi"]
+
+[ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/EEGClient.gd" id="2_eeg"]
+[ext_resource type="Script" path="res://scripts/Player.gd" id="3_player"]
+[ext_resource type="Texture2D" uid="uid://c3jc1rhcy8h1m" path="res://assets/arrow_left.png" id="4_arrowL"]
+[ext_resource type="Texture2D" uid="uid://bfargnag4tgmo" path="res://assets/arrow_right.png" id="5_arrowR"]
+[ext_resource type="Texture2D" uid="uid://crsdbbfi1rhab" path="res://assets/player.png" id="6_player"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Game" type="Node2D" parent="."]
+
+[node name="Road" type="Node2D" parent="Game"]
+
+[node name="BgAll" type="ColorRect" parent="Game/Road"]
+offset_top = -80.0
+offset_right = 1280.0
+offset_bottom = 800.0
+color = Color(0.04, 0.04, 0.06, 1)
+
+[node name="Lane_L" type="ColorRect" parent="Game/Road"]
+offset_left = 390.0
+offset_top = -80.0
+offset_right = 520.0
+offset_bottom = 800.0
+color = Color(0.13, 0.13, 0.18, 1)
+
+[node name="Lane_C" type="ColorRect" parent="Game/Road"]
+offset_left = 520.0
+offset_top = -80.0
+offset_right = 760.0
+offset_bottom = 800.0
+color = Color(0.16, 0.16, 0.22, 1)
+
+[node name="Lane_R" type="ColorRect" parent="Game/Road"]
+offset_left = 760.0
+offset_top = -80.0
+offset_right = 890.0
+offset_bottom = 800.0
+color = Color(0.13, 0.13, 0.18, 1)
+
+[node name="Div_L" type="ColorRect" parent="Game/Road"]
+offset_left = 518.0
+offset_top = -80.0
+offset_right = 522.0
+offset_bottom = 800.0
+color = Color(0.06, 0.06, 0.09, 1)
+
+[node name="Div_R" type="ColorRect" parent="Game/Road"]
+offset_left = 758.0
+offset_top = -80.0
+offset_right = 762.0
+offset_bottom = 800.0
+color = Color(0.06, 0.06, 0.09, 1)
+
+[node name="Player" type="Node2D" parent="Game"]
+position = Vector2(640, 490)
+script = ExtResource("3_player")
+
+[node name="PlayerSprite" type="TextureRect" parent="Game/Player"]
+offset_left = -35.0
+offset_top = -55.0
+offset_right = 35.0
+offset_bottom = 55.0
+texture = ExtResource("6_player")
+expand_mode = 1
+stretch_mode = 3
+
+[node name="EEGClient" type="Node" parent="."]
+script = ExtResource("2_eeg")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="LeftArrow" type="TextureRect" parent="UI"]
+visible = false
+offset_left = 5.0
+offset_top = 100.0
+offset_right = 375.0
+offset_bottom = 620.0
+texture = ExtResource("4_arrowL")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="RightArrow" type="TextureRect" parent="UI"]
+visible = false
+offset_left = 905.0
+offset_top = 100.0
+offset_right = 1275.0
+offset_bottom = 620.0
+texture = ExtResource("5_arrowR")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="GameTimerLabel" type="Label" parent="UI"]
+offset_left = 560.0
+offset_top = 8.0
+offset_right = 720.0
+offset_bottom = 64.0
+theme_override_font_sizes/font_size = 48
+text = "60"
+horizontal_alignment = 1
+
+[node name="PhaseLabel" type="Label" parent="UI"]
+offset_left = 390.0
+offset_top = 638.0
+offset_right = 890.0
+offset_bottom = 690.0
+theme_override_font_sizes/font_size = 22
+text = "Get Ready..."
+horizontal_alignment = 1
+
+[node name="ScoreLabel" type="Label" parent="UI"]
+modulate = Color(0.8, 0.8, 0.8, 0.9)
+offset_left = 390.0
+offset_top = 692.0
+offset_right = 890.0
+offset_bottom = 718.0
+theme_override_font_sizes/font_size = 16
+text = "Avoided: 0  |  Hits: 0"
+horizontal_alignment = 1
+
+[node name="ProgressBar" type="ProgressBar" parent="UI"]
+offset_left = 390.0
+offset_top = 8.0
+offset_right = 890.0
+offset_bottom = 32.0
+
+[node name="HintLeft" type="Label" parent="UI"]
+modulate = Color(0.6, 0.8, 1, 0.85)
+offset_left = 5.0
+offset_top = 628.0
+offset_right = 375.0
+offset_bottom = 662.0
+theme_override_font_sizes/font_size = 18
+text = "10 Hz - Left"
+horizontal_alignment = 1
+
+[node name="HintRight" type="Label" parent="UI"]
+modulate = Color(1, 0.8, 0.6, 0.85)
+offset_left = 905.0
+offset_top = 628.0
+offset_right = 1275.0
+offset_bottom = 662.0
+theme_override_font_sizes/font_size = 18
+text = "12 Hz - Right"
+horizontal_alignment = 1
+
+[node name="EndOverlay" type="ColorRect" parent="UI"]
+visible = false
+offset_left = 200.0
+offset_top = 160.0
+offset_right = 1080.0
+offset_bottom = 560.0
+color = Color(0.05, 0.05, 0.08, 0.96)
+
+[node name="EndLabel" type="Label" parent="UI/EndOverlay"]
+layout_mode = 0
+offset_right = 880.0
+offset_bottom = 400.0
+theme_override_font_sizes/font_size = 42
+text = "Time's Up!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StartScreen" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Bg" type="ColorRect" parent="StartScreen"]
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.04, 0.04, 0.07, 0.97)
+
+[node name="Panel" type="VBoxContainer" parent="StartScreen"]
+offset_left = 390.0
+offset_top = 110.0
+offset_right = 890.0
+offset_bottom = 610.0
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="StartScreen/Panel"]
+modulate = Color(0.5, 0.8, 1, 1)
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "SSVEP Lane Game"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="StartScreen/Panel"]
+modulate = Color(0.7, 0.7, 0.7, 1)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Configure EEG settings before starting"
+horizontal_alignment = 1
+
+[node name="Sep1" type="HSeparator" parent="StartScreen/Panel"]
+layout_mode = 2
+
+[node name="LabelChannels" type="Label" parent="StartScreen/Panel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "EEG Channels  (comma-separated indices, e.g. 1,2,3)"
+
+[node name="ChannelsInput" type="LineEdit" parent="StartScreen/Panel"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "1,2"
+placeholder_text = "e.g. 0,1,2"
+
+[node name="LabelBoard" type="Label" parent="StartScreen/Panel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Board ID  (-1 = synthetic / Brainflow default)"
+
+[node name="BoardInput" type="LineEdit" parent="StartScreen/Panel"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "-1"
+placeholder_text = "-1"
+
+[node name="LabelRecLen" type="Label" parent="StartScreen/Panel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Recording Length (seconds per decision window)"
+
+[node name="RecLenInput" type="LineEdit" parent="StartScreen/Panel"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "5.0"
+placeholder_text = "5.0"
+
+[node name="Sep2" type="HSeparator" parent="StartScreen/Panel"]
+layout_mode = 2
+
+[node name="StartBtn" type="Button" parent="StartScreen/Panel"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Start Game  ▶"

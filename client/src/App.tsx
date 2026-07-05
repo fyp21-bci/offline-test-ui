@@ -3,6 +3,8 @@ import OfflineAnalysis from './pages/OfflineAnalysis';
 import RealTimeAnalysis from './pages/RealTimeAnalysis';
 import GameMode from './pages/GameMode';
 import QuestionnaireMode from './pages/QuestionnaireMode';
+import MazeGame from './pages/MazeGame';
+import ImageSelectionMode from './pages/ImageSelectionMode';
 
 function App() {
   return (
@@ -11,6 +13,8 @@ function App() {
       <Route path="/realtime" element={<RealTimeAnalysis />} />
       <Route path="/game" element={<GameMode />} />
       <Route path="/questionnaire" element={<QuestionnaireMode />} />
+      <Route path="/maze" element={<MazeGame />} />
+      <Route path="/images" element={<ImageSelectionMode />} />
     </Routes>
   );
 }
