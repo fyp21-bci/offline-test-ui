@@ -20,44 +20,35 @@ const ClassificationPanel: React.FC<ClassificationPanelProps> = ({ result, title
         );
     }
 
-    const { predicted_class, confidence, is_correct } = result;
+    const { predicted_class } = result;
 
-    // Determine status color
-    let statusColor = 'bg-slate-700 border-slate-600';
-    let statusText = 'Unknown';
-
-    if (is_correct === true) {
-        statusColor = 'bg-green-900/30 border-green-600/50 text-green-400';
-        statusText = 'Correct';
-    } else if (is_correct === false) {
-        statusColor = 'bg-red-900/30 border-red-600/50 text-red-400';
-        statusText = 'Incorrect';
-    }
+    const classStr = String(predicted_class !== undefined ? predicted_class : '--');
+    const hasHz = classStr.endsWith(' Hz');
+    const mainValue = hasHz ? classStr.replace(' Hz', '') : classStr;
 
     return (
-        <div className="flex flex-col gap-4 h-full">
-            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 shadow-xl flex-1 flex flex-col items-center justify-center">
-                {title && <h4 className="text-slate-500 font-bold uppercase tracking-widest text-sm mb-4">{title}</h4>}
-                <span className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Predicted Class</span>
-                <div className="text-7xl font-mono font-bold text-white tracking-widest my-4 filter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
-                    {predicted_class !== undefined ? predicted_class : '--'}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 h-[80px]">
-                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 flex flex-col items-center">
-                    <span className="text-slate-400 text-[10px] font-bold uppercase mb-1">Confidence</span>
-                    <span className="text-xl font-bold text-sky-400">
-                        {confidence !== undefined ? (confidence * 100).toFixed(1) : '0.0'}%
+        <div className="w-full h-full p-2">
+            <div 
+                className="flex flex-col w-full h-full rounded-[2rem] border-4 border-purple-800 items-center justify-center shadow-2xl shadow-purple-900/20"
+                style={{
+                    backgroundColor: 'rgba(168, 85, 247, 0.05)',
+                    transition: 'background-color 0.9s'
+                }}
+            >
+                <span 
+                    className="font-bold text-blue-400 leading-none tracking-tight drop-shadow-md"
+                    style={{ fontSize: '11rem' }}
+                >
+                    {mainValue}
+                </span>
+                {hasHz && (
+                    <span 
+                        className="font-bold text-blue-500 mt-4"
+                        style={{ fontSize: '3.5rem' }}
+                    >
+                        Hz
                     </span>
-                </div>
-
-                <div className={`rounded-lg p-3 border flex flex-col items-center ${statusColor}`}>
-                    <span className="text-[10px] font-bold uppercase mb-1 opacity-70">Accuracy</span>
-                    <span className="text-xl font-bold">
-                        {statusText}
-                    </span>
-                </div>
+                )}
             </div>
         </div>
     );

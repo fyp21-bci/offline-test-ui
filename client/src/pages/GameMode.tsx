@@ -121,9 +121,6 @@ const GameMode = () => {
                                 <div className="text-2xl font-bold text-white mb-1">
                                     {prediction.frequency.toFixed(1)} <span className="text-sm text-slate-400">Hz</span>
                                 </div>
-                                <div className="text-xs text-green-400">
-                                    Confidence: {(prediction.confidence * 100).toFixed(1)}%
-                                </div>
                             </div>
                         ) : (
                             <div className="text-sm text-slate-500 italic">Waiting...</div>

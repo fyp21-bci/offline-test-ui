@@ -500,17 +500,17 @@ function RealTimeAnalysis() {
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0 overflow-hidden">
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0 overflow-hidden">
 
                     {/* Left Column: Signal Plots */}
-                    <div className="lg:col-span-2 flex flex-col gap-4 min-h-0 overflow-y-auto">
-                        <div className="h-[250px] shrink-0">
+                    <div className="lg:col-span-3 flex flex-col gap-6 min-h-0 overflow-y-auto min-w-0 pr-2">
+                        <div className="h-[300px] shrink-0 w-full min-w-0">
                             <ServerSidePlot
                                 title="Time Domain (Raw EEG)"
                                 imageBase64={plots?.time_plot}
                             />
                         </div>
-                        <div className="h-[250px] shrink-0">
+                        <div className="h-[300px] shrink-0 w-full min-w-0">
                             <ServerSidePlot
                                 title="Frequency Domain (FFT)"
                                 imageBase64={plots?.fft_plot}
@@ -519,40 +519,28 @@ function RealTimeAnalysis() {
                     </div>
 
                     {/* Right Column: Classification Results */}
-                    <div className="lg:col-span-2 flex flex-col gap-4 min-h-0 overflow-y-auto">
+                    <div className="lg:col-span-1 flex flex-col gap-6 min-h-0 overflow-y-auto min-w-0 pr-2">
 
                         {/* TMSI Results */}
                         {activeProcessors['TMSI Classifier'] && (
-                            <div className="flex gap-4 h-[300px]">
-                                <div className="w-[300px] shrink-0">
-                                    <ClassificationPanel result={results['TMSI Classifier']} title="TMSI Result" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <ServerSidePlot
-                                        title="TMSI Analysis Window"
-                                        imageBase64={plots?.['classification_plot_TMSI Classifier']}
-                                    />
+                            <div className="flex flex-col gap-4 w-full min-w-0">
+                                <div className="h-[300px] w-full shrink-0">
+                                    <ClassificationPanel result={results['TMSI Classifier']} title="TMSI Prediction" />
                                 </div>
                             </div>
                         )}
 
                         {/* FBCCA Results */}
                         {activeProcessors['FBCCA Classifier'] && (
-                            <div className="flex gap-4 h-[300px]">
-                                <div className="w-[300px] shrink-0">
-                                    <ClassificationPanel result={results['FBCCA Classifier']} title="FBCCA Result" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <ServerSidePlot
-                                        title="FBCCA Analysis Window"
-                                        imageBase64={plots?.['classification_plot_FBCCA Classifier']}
-                                    />
+                            <div className="flex flex-col gap-4 w-full min-w-0">
+                                <div className="h-[300px] w-full shrink-0">
+                                    <ClassificationPanel result={results['FBCCA Classifier']} title="FBCCA Prediction" />
                                 </div>
                             </div>
                         )}
 
                         {/* Stream Stats (Shared) */}
-                        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700 mt-auto">
+                        <div className="bg-slate-900 rounded-lg p-4 border border-slate-700 mt-auto shrink-0">
                             <h3 className="text-gray-400 text-xs font-bold uppercase mb-2">System Status</h3>
                             <div className="grid grid-cols-3 gap-4 text-sm text-slate-500 font-mono">
                                 <div>

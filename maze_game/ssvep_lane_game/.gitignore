@@ -1,0 +1,11 @@
+# Godot-generated files
+.godot/
+*.import
+export_presets.cfg
+
+# Builds
+builds/
+*.exe
+*.x86_64
+*.dmg
+*.app

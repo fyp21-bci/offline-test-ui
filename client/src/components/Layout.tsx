@@ -8,7 +8,7 @@ const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ 
                 <div className="header-content">
                     <div className="brand">
                         <div className="status-dot" />
-                        <h1 className="brand-text text-2xl font-bold tracking-tight">Signal Studio</h1>
+                        <h1 className="brand-text text-2xl font-bold tracking-tight">Assistive Care BCI</h1>
                     </div>
                     <nav className="nav-links flex gap-3">
                         <NavLink 
@@ -71,6 +71,38 @@ const Layout: React.FC<{ children: React.ReactNode; fullWidth?: boolean }> = ({ 
                                 <>
                                     <span>📋</span>
                                     <span>Questionnaire</span>
+                                    {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                                </>
+                            )}
+                        </NavLink>
+                        <NavLink 
+                            to="/maze" 
+                            className={({ isActive }) => `px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 inline-flex items-center gap-2 relative ${
+                                isActive 
+                                    ? 'bg-accent text-black shadow-lg hover:shadow-xl scale-105' 
+                                    : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
+                            }`}
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    <span>🧩</span>
+                                    <span>Maze Game</span>
+                                    {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
+                                </>
+                            )}
+                        </NavLink>
+                        <NavLink 
+                            to="/images" 
+                            className={({ isActive }) => `px-5 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 inline-flex items-center gap-2 relative ${
+                                isActive 
+                                    ? 'bg-accent text-black shadow-lg hover:shadow-xl scale-105' 
+                                    : 'text-secondary hover:text-primary hover:bg-bg-active border-2 border-transparent hover:border-accent'
+                            }`}
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    <span>🖼️</span>
+                                    <span>Image Selector</span>
                                     {isActive && <span className="absolute -top-1 -right-1 w-3 h-3 bg-accent-light rounded-full animate-pulse"></span>}
                                 </>
                             )}
